@@ -1,0 +1,16 @@
+{
+  "name": "geometry-arena",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A Geometry Wars–inspired twin-stick shooter for the browser.",
+  "scripts": {
+    "dev": "npx --yes serve -l 5173",
+    "start": "npx --yes serve -l 5173",
+    "preview": "npx --yes serve -l 5173",
+    "uat": "node uat/logic-uat.mjs && node uat/adversarial-uat.mjs && node uat/browser-uat.mjs",
+    "uat:logic": "node uat/logic-uat.mjs",
+    "uat:adversarial": "node uat/adversarial-uat.mjs",
+    "uat:browser": "node uat/browser-uat.mjs"
+  }
+}

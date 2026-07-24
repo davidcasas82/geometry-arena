@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="description" content="Geometry Arena — a Geometry Wars–inspired twin-stick shooter. WASD + mouse or gamepad, survive the swarm." />
+  <meta name="theme-color" content="#05060c" />
+  <title>Geometry Arena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&family=Outfit:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%2305060c'/%3E%3Cpolygon points='70,50 30,72 38,50 30,28' fill='none' stroke='%237df9ff' stroke-width='6'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <!-- Full-screen 16-bit title splash (Battletoads / SNES-inspired) -->
+  <div id="splash" class="splash" role="dialog" aria-modal="true" aria-label="Geometry Arena title screen">
+    <div class="splash-stars" aria-hidden="true"></div>
+    <div class="splash-shapes" aria-hidden="true">
+      <span class="shape cube c1"></span>
+      <span class="shape cube c2"></span>
+      <span class="shape sphere s1"></span>
+      <span class="shape sphere s2"></span>
+      <span class="shape diamond d1"></span>
+      <span class="shape diamond d2"></span>
+      <span class="shape diamond d3"></span>
+      <span class="shape tri t1"></span>
+      <span class="shape tri t2"></span>
+      <span class="shape star st1"></span>
+      <span class="shape star st2"></span>
+      <span class="shape star st3"></span>
+      <span class="shape star st4"></span>
+      <span class="shape ring r1"></span>
+      <span class="shape ring r2"></span>
+    </div>
+    <div class="splash-logo">
+      <h1 class="logo-title" aria-label="Geometry Arena">
+        <span class="logo-line logo-geometry">
+          <span class="logo-fill">GEOMETRY</span>
+        </span>
+        <span class="logo-line logo-arena">
+          <span class="logo-fill">ARENA</span>
+        </span>
+      </h1>
+      <p class="logo-sub">TWIN-STICK · NEON SWARM</p>
+    </div>
+    <p class="splash-prompt" id="splash-prompt">PRESS ANY KEY</p>
+    <div class="splash-scanlines" aria-hidden="true"></div>
+  </div>
+
+  <div id="app">
+    <header class="top-bar">
+      <div class="brand" aria-label="Geometry Arena">
+        <div class="brand-logo title-logo">
+          <span class="title-logo-line title-logo-geo"><span class="title-logo-fill">GEOMETRY</span></span>
+          <span class="title-logo-line title-logo-arena"><span class="title-logo-fill">ARENA</span></span>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">Score</span>
+          <span id="score" class="stat-value">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Level</span>
+          <span id="level" class="stat-value">1</span>
+        </div>
+        <div class="stat accent">
+          <span class="stat-label">Mult</span>
+          <span id="mult" class="stat-value">×1</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Lives</span>
+          <span id="lives" class="stat-value">3</span>
+        </div>
+        <div class="stat bomb-stat">
+          <span class="stat-label">Bombs</span>
+          <span id="bombs" class="stat-value">3</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Best</span>
+          <span id="best" class="stat-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="stage-wrap">
+      <canvas id="game" width="1600" height="900" aria-label="Geometry Arena playfield"></canvas>
+
+      <div id="overlay" class="overlay mode-title hidden" aria-live="polite">
+        <!-- Live-grid title menu (post-splash / menu state) -->
+        <div id="title-menu" class="title-menu">
+          <div class="title-logo" aria-hidden="true">
+            <span class="title-logo-line title-logo-geo"><span class="title-logo-fill">GEOMETRY</span></span>
+            <span class="title-logo-line title-logo-arena"><span class="title-logo-fill">ARENA</span></span>
+          </div>
+          <p class="title-tag">TWIN-STICK · NEON SWARM</p>
+
+          <button id="start-btn" class="btn arcade" type="button">PLAY</button>
+          <p class="title-best">BEST <span id="title-best">0</span></p>
+          <button id="help-btn" class="title-help" type="button">HOW TO PLAY</button>
+
+          <ul id="how-to" class="how-to title-howto hidden">
+            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · click-hold fire · drag to aim</li>
+            <li>Gamepad: left stick move · right stick aim · RT fire · LT bomb</li>
+            <li>Kill → green <strong>geoms</strong> → scoop for ×mult (scores explode)</li>
+            <li>Pink dashes · purple splitters · voids pull you in</li>
+            <li><kbd>Space</kbd> / A bomb clears (no points) · death resets mult</li>
+            <li>Extra life · bomb milestones · <kbd>P</kbd> / Start pause</li>
+          </ul>
+        </div>
+
+        <!-- Interrupt card: pause / game over only -->
+        <div id="interrupt-panel" class="panel interrupt-panel hidden">
+          <div class="panel-glow"></div>
+          <h2 id="overlay-title">Paused</h2>
+          <p id="overlay-message">Take a breath. The shapes can wait.</p>
+          <button id="interrupt-btn" class="btn arcade compact" type="button">Resume</button>
+          <button id="resume-btn" class="btn secondary hidden" type="button">Resume</button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="bottom-bar">
+      <p class="hint">Inspired by Geometry Wars · Local high score only</p>
+      <div class="actions">
+        <button id="pause-btn" class="btn ghost" type="button">Pause</button>
+        <button id="mute-btn" class="btn ghost" type="button" title="Toggle sound">Sound</button>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

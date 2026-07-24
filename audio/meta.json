@@ -1,0 +1,28 @@
+{
+  "task_id": "5f27ae8f-337d-4881-949d-af1cc2642e32",
+  "style": "High-energy instrumental electronic action score at 145 BPM, merging frenetic chiptune and synthwave. Punchy analog synth arpeggios, aggressive sidechained bass, glitchy digital percussion, laser zaps, and dense layered synth stacks hit with neon cyber-arena intensity. Rhythm starts stumbling with syncopated stutters, then locks into a driving, euphoric pulse. Geometry Wars twin-stick shooter soundtrack energy.",
+  "cost": {
+    "amount": 0.77,
+    "currency": "credit"
+  },
+  "variants": [
+    {
+      "index": 0,
+      "id": "73af3564-d03f-4e7a-9bca-19a52a821922",
+      "title": "Neon Swarm",
+      "duration": 136.8,
+      "audio_url": "https://cdn1.suno.ai/73af3564-d03f-4e7a-9bca-19a52a821922.mp3",
+      "wav": null,
+      "mp3": "audio/neon-swarm-1.mp3"
+    },
+    {
+      "index": 1,
+      "id": "5587a933-2909-43dd-9d6b-7fe190c51cba",
+      "title": "Neon Swarm",
+      "duration": 104.32,
+      "audio_url": "https://cdn1.suno.ai/5587a933-2909-43dd-9d6b-7fe190c51cba.mp3",
+      "wav": null,
+      "mp3": "audio/neon-swarm-2.mp3"
+    }
+  ]
+}

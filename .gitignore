@@ -1,0 +1,28 @@
+# Dependencies / tooling
+node_modules/
+.npm/
+package-lock.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.code-workspace
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs & caches
+*.log
+.cache/
+dist/
+.vercel/
+.netlify/
+
+# Grok / agent session junk (if any)
+.grok/
