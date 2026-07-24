@@ -176,7 +176,8 @@ Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu stil
 - **Logo:** Orbitron blackletter-style chrome gradients + extruded text-shadow; Press Start 2P for prompts/buttons
 - **Entities:** hover height + ground shadow for “above the grid” read
 - **Camera:** trauma shake with combat soft-cap + diminishing returns (dense kills don’t pin full earthquake); big events use `{ big: true }`; zoom punch on set pieces; menu camera drift  
-- **Presentation (Phase A):** DPR-scaled world buffer (cap 2×), dual-pass bloom, trauma chromatic fringe, mult color grade + stronger vignette (`GFX` in constants, `postfx.js`)
+- **Presentation (Phase A):** DPR-scaled world buffer (cap 2×), dual-pass bloom, trauma chromatic fringe, mult color grade + stronger vignette (`GFX` in constants, `postfx.js`)  
+- **Touch / mobile:** dual virtual sticks (left move, right aim+auto-fire), BOMB/PAUSE fabs; gated by coarse pointer or narrow+touch — desktop unchanged (`input.bindTouchControls`, `body.touch-ui`)
 - **BGM:** Suno “Neon Swarm” variants; alternate by level parity via `playLevelTheme(level)`
 
 ---

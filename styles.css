@@ -648,6 +648,245 @@ body {
   }
 }
 
+/* ── Touch / mobile twin-stick ─────────────────────────── */
+.touch-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.touch-controls.hidden {
+  display: none;
+}
+
+.touch-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  pointer-events: auto;
+  touch-action: none;
+  /* Invisible hit areas — sticks appear on press */
+  background: transparent;
+}
+
+.touch-zone-move {
+  left: 0;
+}
+
+.touch-zone-aim {
+  right: 0;
+}
+
+.touch-stick {
+  position: fixed;
+  width: 120px;
+  height: 120px;
+  margin-left: -60px;
+  margin-top: -60px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.touch-stick.hidden {
+  display: none;
+}
+
+.touch-stick-base {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(94, 252, 255, 0.35);
+  background: rgba(6, 12, 28, 0.28);
+  box-shadow: 0 0 24px rgba(40, 140, 255, 0.2), inset 0 0 20px rgba(0, 0, 0, 0.35);
+}
+
+.touch-stick-base.aim {
+  border-color: rgba(255, 120, 200, 0.35);
+  box-shadow: 0 0 24px rgba(255, 80, 160, 0.18), inset 0 0 20px rgba(0, 0, 0, 0.35);
+}
+
+.touch-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(180, 255, 255, 0.95), rgba(40, 180, 255, 0.55));
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 16px rgba(94, 252, 255, 0.55);
+  will-change: transform;
+}
+
+.touch-stick-knob.aim {
+  background: radial-gradient(circle at 35% 30%, rgba(255, 220, 240, 0.95), rgba(255, 80, 160, 0.55));
+  box-shadow: 0 0 16px rgba(255, 100, 180, 0.5);
+}
+
+.touch-fab {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: manipulation;
+  border: 2px solid rgba(94, 252, 255, 0.4);
+  border-radius: 999px;
+  background: rgba(6, 10, 24, 0.72);
+  color: #e8f7ff;
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 20px rgba(40, 120, 255, 0.25);
+  -webkit-tap-highlight-color: transparent;
+  z-index: 7;
+}
+
+.touch-fab:active {
+  transform: scale(0.94);
+  background: rgba(20, 40, 80, 0.85);
+}
+
+.touch-bomb {
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
+  min-width: 72px;
+  min-height: 72px;
+  padding: 0 14px;
+  font-size: 0.72rem;
+  border-color: rgba(255, 220, 80, 0.55);
+  color: #ffe566;
+  box-shadow: 0 0 22px rgba(255, 200, 40, 0.28);
+}
+
+.touch-pause {
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  width: 48px;
+  height: 48px;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+
+.touch-hint {
+  position: absolute;
+  left: 50%;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(180, 210, 255, 0.4);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.portrait-hint {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(6, 10, 24, 0.88);
+  border: 1px solid rgba(94, 252, 255, 0.35);
+  color: #d0e8ff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.portrait-hint.hidden {
+  display: none;
+}
+
+/* Compact chrome when body.touch-ui (phones / tablets) */
+body.touch-ui {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+body.touch-ui #app {
+  padding: 2px 4px 2px;
+  gap: 2px;
+}
+
+body.touch-ui .top-bar {
+  min-height: 0;
+  padding: 2px 2px 0;
+  gap: 6px;
+}
+
+body.touch-ui .brand {
+  display: none;
+}
+
+body.touch-ui .stats {
+  width: 100%;
+  justify-content: space-between;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+body.touch-ui .stat {
+  min-width: 0;
+  flex: 1;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+body.touch-ui .stat-label {
+  font-size: 0.55rem;
+}
+
+body.touch-ui .stat-value {
+  font-size: 0.95rem;
+}
+
+body.touch-ui .stat:nth-child(2),
+body.touch-ui .stat:nth-child(6) {
+  /* Level + Best — hide to free space */
+  display: none;
+}
+
+body.touch-ui .bottom-bar {
+  display: none;
+}
+
+body.touch-ui .stage-wrap {
+  border-radius: 8px;
+}
+
+body.touch-ui .btn.arcade {
+  min-height: 52px;
+  min-width: 160px;
+  font-size: 1.05rem;
+}
+
+body.touch-ui .title-menu {
+  max-width: min(520px, 96vw);
+  padding: 0 8px;
+}
+
+/* Portrait: nudge landscape */
+@media (orientation: portrait) and (max-width: 900px) {
+  body.touch-ui .portrait-hint:not(.hidden) {
+    display: block;
+  }
+}
+
+@media (orientation: landscape) {
+  .portrait-hint {
+    display: none !important;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════
    Full-screen 16-bit splash — SNES title-screen energy
    (Battletoads / Double Dragon inspired: black void, huge

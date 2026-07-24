@@ -1,22 +1,22 @@
 /**
- * Keyboard + trackpad/mouse + gamepad input.
+ * Keyboard + trackpad/mouse + gamepad + touch input.
  *
- * Move: WASD / arrows / left stick (analog magnitude) / D-pad (full speed).
- * Aim: relative trackpad/mouse motion, or right stick (absolute direction).
- * Fire: hold trackpad/mouse button, or RT / RB.
- * Bomb: Space / B key, or LT / A / LB (edge).
- * Pause: P / Esc, or Start / Options.
- * Mute: M, or Back / Select / Share.
- * Restart (game over): R, or A / Start.
+ * Move: WASD / arrows / left stick / D-pad / left virtual stick.
+ * Aim: mouse / right stick / right virtual stick.
+ * Fire: mouse hold / RT / RB / right virtual stick held (auto-fire).
+ * Bomb: Space / B / LT / A / LB / touch bomb button.
+ * Pause: P / Esc / Start / touch pause button.
  *
- * Bluetooth pads work once paired at the OS level — the browser Gamepad API
- * exposes them the same as wired controllers.
+ * Touch UI is opt-in via bindTouchControls + setTouchActive — desktop
+ * mouse/keyboard paths are unchanged when touch is inactive.
  */
 
 import {
   AIM_SENSITIVITY,
   GAMEPAD_DEADZONE,
   GAMEPAD_FIRE_THRESHOLD,
+  TOUCH_DEADZONE,
+  TOUCH_STICK_RADIUS,
 } from "./constants.js";
 
 /** Standard gamepad button indices (W3C). */
@@ -92,6 +92,15 @@ export class Input {
     /** True after a splash-dismiss press until all menu buttons release. */
     this._blockMenuConfirm = false;
 
+    /** Touch virtual sticks (only while setTouchActive(true)). */
+    this.touchActive = false;
+    this._touchMove = { x: 0, y: 0 };
+    this._touchFire = false;
+    this._blockTouchFire = false;
+    /** @type {Map<number, { role: 'move'|'aim', ox: number, oy: number }>} */
+    this._touchPtrs = new Map();
+    this._touchUI = null;
+
     this._onKeyDown = (e) => {
       const code = e.code;
       if (
@@ -162,6 +171,7 @@ export class Input {
       this._gpMove.y = 0;
       this._gpFire = false;
       this._gpPrev = Object.create(null);
+      this._resetTouchSticks();
     };
 
     this._onContext = (e) => e.preventDefault();
@@ -333,9 +343,161 @@ export class Input {
   }
 
   /**
-   * Movement from WASD / arrows / left stick / D-pad.
-   * Keyboard + D-pad are full speed (unit). Left stick preserves analog
-   * magnitude so partial tilt is slower. Combined length is capped at 1.
+   * Wire DOM touch zones + stick visuals. Safe to call once from main.js.
+   * @param {{
+   *   root: HTMLElement,
+   *   moveZone: HTMLElement,
+   *   aimZone: HTMLElement,
+   *   moveStick: HTMLElement,
+   *   aimStick: HTMLElement,
+   *   moveKnob: HTMLElement,
+   *   aimKnob: HTMLElement,
+   *   bombBtn?: HTMLElement|null,
+   *   pauseBtn?: HTMLElement|null,
+   * }} ui
+   */
+  bindTouchControls(ui) {
+    if (!ui?.moveZone || !ui?.aimZone) return;
+    this._touchUI = ui;
+    const onDown = (role) => (e) => {
+      if (!this.touchActive) return;
+      if (e.pointerType === "mouse") return; // desktop mouse uses classic aim
+      e.preventDefault();
+      e.stopPropagation();
+      if (this._touchPtrs.has(e.pointerId)) return;
+      // One pointer per role
+      for (const p of this._touchPtrs.values()) {
+        if (p.role === role) return;
+      }
+      const ox = e.clientX;
+      const oy = e.clientY;
+      this._touchPtrs.set(e.pointerId, { role, ox, oy });
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      this._showTouchStick(role, ox, oy, 0, 0);
+      if (role === "aim") this._touchFire = true;
+    };
+
+    const onMove = (e) => {
+      const rec = this._touchPtrs.get(e.pointerId);
+      if (!rec) return;
+      e.preventDefault();
+      const dx = e.clientX - rec.ox;
+      const dy = e.clientY - rec.oy;
+      const vec = this._touchStickVector(dx, dy);
+      if (rec.role === "move") {
+        this._touchMove.x = vec.x;
+        this._touchMove.y = vec.y;
+      } else {
+        if (vec.x !== 0 || vec.y !== 0) {
+          const l = Math.hypot(vec.x, vec.y);
+          this.aim.x = vec.x / l;
+          this.aim.y = vec.y / l;
+        }
+        this._touchFire = true;
+      }
+      this._showTouchStick(rec.role, rec.ox, rec.oy, dx, dy);
+    };
+
+    const onUp = (e) => {
+      const rec = this._touchPtrs.get(e.pointerId);
+      if (!rec) return;
+      e.preventDefault();
+      this._touchPtrs.delete(e.pointerId);
+      this._hideTouchStick(rec.role);
+      if (rec.role === "move") {
+        this._touchMove.x = 0;
+        this._touchMove.y = 0;
+      } else {
+        this._touchFire = false;
+        this._blockTouchFire = false;
+      }
+    };
+
+    ui.moveZone.addEventListener("pointerdown", onDown("move"));
+    ui.aimZone.addEventListener("pointerdown", onDown("aim"));
+    for (const z of [ui.moveZone, ui.aimZone]) {
+      z.addEventListener("pointermove", onMove);
+      z.addEventListener("pointerup", onUp);
+      z.addEventListener("pointercancel", onUp);
+      z.addEventListener("lostpointercapture", onUp);
+    }
+
+    ui.bombBtn?.addEventListener("pointerdown", (e) => {
+      if (!this.touchActive) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this._bombPressed = true;
+    });
+
+    ui.pauseBtn?.addEventListener("pointerdown", (e) => {
+      if (!this.touchActive) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this._pausePressed = true;
+    });
+  }
+
+  /** Enable/disable virtual sticks (only while playing on touch devices). */
+  setTouchActive(on) {
+    this.touchActive = !!on;
+    if (!on) this._resetTouchSticks();
+  }
+
+  _touchStickVector(dx, dy) {
+    const maxR = TOUCH_STICK_RADIUS;
+    const mag = Math.hypot(dx, dy);
+    if (mag < 1e-6) return { x: 0, y: 0 };
+    const nx = dx / mag;
+    const ny = dy / mag;
+    const clamped = Math.min(1, mag / maxR);
+    // Apply deadzone in unit space
+    if (clamped < TOUCH_DEADZONE) return { x: 0, y: 0 };
+    const scaled = (clamped - TOUCH_DEADZONE) / (1 - TOUCH_DEADZONE);
+    return { x: nx * scaled, y: ny * scaled };
+  }
+
+  _showTouchStick(role, ox, oy, dx, dy) {
+    const ui = this._touchUI;
+    if (!ui) return;
+    const el = role === "move" ? ui.moveStick : ui.aimStick;
+    const knob = role === "move" ? ui.moveKnob : ui.aimKnob;
+    if (!el || !knob) return;
+    el.classList.remove("hidden");
+    el.style.left = `${ox}px`;
+    el.style.top = `${oy}px`;
+    const maxR = TOUCH_STICK_RADIUS;
+    const mag = Math.hypot(dx, dy);
+    const f = mag > maxR && mag > 0 ? maxR / mag : 1;
+    knob.style.transform = `translate(${dx * f}px, ${dy * f}px)`;
+  }
+
+  _hideTouchStick(role) {
+    const ui = this._touchUI;
+    if (!ui) return;
+    const el = role === "move" ? ui.moveStick : ui.aimStick;
+    const knob = role === "move" ? ui.moveKnob : ui.aimKnob;
+    el?.classList.add("hidden");
+    if (knob) knob.style.transform = "translate(0, 0)";
+  }
+
+  _resetTouchSticks() {
+    this._touchPtrs.clear();
+    this._touchMove.x = 0;
+    this._touchMove.y = 0;
+    this._touchFire = false;
+    this._blockTouchFire = false;
+    this._hideTouchStick("move");
+    this._hideTouchStick("aim");
+  }
+
+  /**
+   * Movement from WASD / arrows / left stick / D-pad / touch stick.
+   * Keyboard + D-pad are full speed (unit). Analog sticks preserve magnitude.
+   * Combined length is capped at 1.
    */
   moveVector() {
     this.pollGamepad();
@@ -357,6 +519,10 @@ export class Input {
 
     x += this._gpMove.x;
     y += this._gpMove.y;
+    if (this.touchActive) {
+      x += this._touchMove.x;
+      y += this._touchMove.y;
+    }
 
     // Cap so keyboard + stick cannot exceed full speed
     const mag = Math.hypot(x, y);
@@ -367,12 +533,14 @@ export class Input {
     return { x, y };
   }
 
-  /** True while primary button or RT/RB is held. */
+  /** True while primary button, RT/RB, or right virtual stick is held. */
   isFiring() {
     this.pollGamepad();
     const mouse = this.mouseDown && !this._blockFire;
     const pad = this._gpFire && !this._blockGpFire;
-    return mouse || pad;
+    const touch =
+      this.touchActive && this._touchFire && !this._blockTouchFire;
+    return mouse || pad || touch;
   }
 
   aimVector() {
@@ -387,6 +555,15 @@ export class Input {
 
   /** Prefer pointer lock for continuous trackpad aim without hitting screen edges. */
   requestPointerLock() {
+    // Touch / mobile: pointer lock is unnecessary and often blocked
+    if (this.touchActive) return;
+    if (typeof window !== "undefined") {
+      const coarse =
+        window.matchMedia?.("(pointer: coarse)")?.matches ||
+        (navigator.maxTouchPoints || 0) > 0 &&
+          window.matchMedia?.("(max-width: 900px)")?.matches;
+      if (coarse) return;
+    }
     if (document.pointerLockElement === this.canvas) return;
     try {
       this.canvas.requestPointerLock?.();
@@ -411,6 +588,7 @@ export class Input {
     // Snapshot residual trigger: only block pad fire if already held.
     this.pollGamepad();
     this._blockGpFire = this._gpFire;
+    this._blockTouchFire = this._touchFire;
   }
 
   /**

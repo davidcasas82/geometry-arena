@@ -73,6 +73,13 @@ export const GAMEPAD_DEADZONE = 0.18;
 /** Analog trigger (RT) must exceed this to count as fire. */
 export const GAMEPAD_FIRE_THRESHOLD = 0.35;
 
+/** Virtual stick max radius in CSS px before full tilt. */
+export const TOUCH_STICK_RADIUS = 54;
+/** Same deadzone ratio as gamepad for thumb sticks. */
+export const TOUCH_DEADZONE = 0.16;
+/** Cap DPR on coarse/touch devices for battery + heat. */
+export const TOUCH_MAX_DPR = 1.5;
+
 // ── Dial B: Density (ease-in toward ~2–3 min intensity) ──
 export const MAX_ENEMIES = 55;
 /** Slow opening tempo */

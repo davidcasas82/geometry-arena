@@ -22,10 +22,44 @@ const howTo = document.getElementById("how-to");
 const titleMenu = document.getElementById("title-menu");
 const interruptPanel = document.getElementById("interrupt-panel");
 const splash = document.getElementById("splash");
+const touchControls = document.getElementById("touch-controls");
+const portraitHint = document.getElementById("portrait-hint");
 
 let pendingAction = null;
 let splashDone = false;
 let helpOpen = false;
+
+/** Phones / tablets: touch points + coarse pointer or narrow viewport. */
+function preferTouchUI() {
+  if (typeof window === "undefined") return false;
+  const touchPoints = navigator.maxTouchPoints || 0;
+  if (touchPoints <= 0) return false;
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const narrow = window.matchMedia("(max-width: 900px)").matches;
+  return coarse || narrow;
+}
+
+function syncTouchChrome() {
+  const want = preferTouchUI();
+  document.body.classList.toggle("touch-ui", want);
+
+  const playing = game?.state === "playing";
+  const showSticks = want && playing;
+
+  if (touchControls) {
+    touchControls.classList.toggle("hidden", !showSticks);
+    touchControls.setAttribute("aria-hidden", showSticks ? "false" : "true");
+  }
+  game?.input?.setTouchActive(showSticks);
+
+  // Portrait hint while on a touch device in portrait
+  const portrait =
+    want && window.matchMedia("(orientation: portrait)").matches;
+  portraitHint?.classList.toggle("hidden", !portrait);
+
+  // Refit canvas when chrome density changes
+  game?.fitCanvas?.();
+}
 
 function format(n) {
   return n.toLocaleString("en-US");
@@ -59,6 +93,7 @@ function showTitleMenu() {
     titleMenu.classList.add("entering");
   }
   overlay?.classList.remove("hidden");
+  syncTouchChrome();
 }
 
 const ui = {
@@ -86,6 +121,7 @@ const ui = {
     overlay.classList.add("hidden");
     howTo?.classList.add("hidden");
     helpOpen = false;
+    syncTouchChrome();
   },
   /** Interrupt UIs only (pause / game over). Title menu uses showTitleMenu. */
   showOverlay(title, message, showResume = false, primaryLabel = "Play", onPrimary = null) {
@@ -105,6 +141,7 @@ const ui = {
     howTo?.classList.add("hidden");
     setOverlayMode("panel");
     overlay.classList.remove("hidden");
+    syncTouchChrome();
   },
   showTitleMenu,
   setMuteLabel(on) {
@@ -150,8 +187,32 @@ window.__geometryArena = game;
 window.__arenaRuns = () => dumpRunsToConsole();
 window.__arenaRecent = () => getRecentRuns(10);
 
+// Virtual sticks + bomb/pause (no-ops on desktop mouse)
+game.input.bindTouchControls({
+  root: touchControls,
+  moveZone: document.getElementById("touch-zone-move"),
+  aimZone: document.getElementById("touch-zone-aim"),
+  moveStick: document.getElementById("touch-stick-move"),
+  aimStick: document.getElementById("touch-stick-aim"),
+  moveKnob: document.getElementById("touch-knob-move"),
+  aimKnob: document.getElementById("touch-knob-aim"),
+  bombBtn: document.getElementById("touch-bomb"),
+  pauseBtn: document.getElementById("touch-pause"),
+});
+
+syncTouchChrome();
+window.addEventListener("resize", syncTouchChrome);
+window.addEventListener("orientationchange", () => {
+  setTimeout(syncTouchChrome, 120);
+});
+// Coarse pointer can change when docking keyboards etc.
+window.matchMedia("(pointer: coarse)").addEventListener?.("change", syncTouchChrome);
+window.matchMedia("(max-width: 900px)").addEventListener?.("change", syncTouchChrome);
+
 // Gamepad: splash dismiss + title PLAY (keyboard still handled below).
 // Same physical press must not dismiss splash and immediately start a run.
+// Also keep touch chrome in sync with game state.
+let lastTouchState = "";
 function gamepadUiTick() {
   const input = game.input;
   if (!splashDone) {
@@ -167,6 +228,12 @@ function gamepadUiTick() {
   ) {
     if (input.consumeMenuConfirm()) onPrimaryAction();
   }
+
+  const sig = `${game.state}|${preferTouchUI()}`;
+  if (sig !== lastTouchState) {
+    lastTouchState = sig;
+    syncTouchChrome();
+  }
   requestAnimationFrame(gamepadUiTick);
 }
 requestAnimationFrame(gamepadUiTick);
@@ -176,9 +243,11 @@ function onPrimaryAction() {
     const fn = pendingAction;
     pendingAction = null;
     fn();
+    syncTouchChrome();
     return;
   }
   game.start();
+  syncTouchChrome();
 }
 
 startBtn?.addEventListener("click", onPrimaryAction);

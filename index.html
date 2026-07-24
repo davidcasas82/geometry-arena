@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="description" content="Geometry Arena — a Geometry Wars–inspired twin-stick shooter. WASD + mouse or gamepad, survive the swarm." />
   <meta name="theme-color" content="#05060c" />
   <title>Geometry Arena</title>
@@ -44,7 +44,7 @@
       </h1>
       <p class="logo-sub">TWIN-STICK · NEON SWARM</p>
     </div>
-    <p class="splash-prompt" id="splash-prompt">PRESS ANY KEY</p>
+    <p class="splash-prompt" id="splash-prompt">PRESS ANY KEY · TAP TO START</p>
     <div class="splash-scanlines" aria-hidden="true"></div>
   </div>
 
@@ -87,6 +87,23 @@
     <main class="stage-wrap">
       <canvas id="game" width="1600" height="900" aria-label="Geometry Arena playfield"></canvas>
 
+      <!-- Mobile twin-stick layer (shown only while playing on touch devices) -->
+      <div id="touch-controls" class="touch-controls hidden" aria-hidden="true">
+        <div id="touch-zone-move" class="touch-zone touch-zone-move" data-stick="move"></div>
+        <div id="touch-zone-aim" class="touch-zone touch-zone-aim" data-stick="aim"></div>
+        <div id="touch-stick-move" class="touch-stick touch-stick-move hidden" aria-hidden="true">
+          <div class="touch-stick-base"></div>
+          <div id="touch-knob-move" class="touch-stick-knob"></div>
+        </div>
+        <div id="touch-stick-aim" class="touch-stick touch-stick-aim hidden" aria-hidden="true">
+          <div class="touch-stick-base aim"></div>
+          <div id="touch-knob-aim" class="touch-stick-knob aim"></div>
+        </div>
+        <button type="button" id="touch-bomb" class="touch-fab touch-bomb" aria-label="Bomb">BOMB</button>
+        <button type="button" id="touch-pause" class="touch-fab touch-pause" aria-label="Pause">❚❚</button>
+        <p class="touch-hint" aria-hidden="true">L MOVE · R AIM + FIRE</p>
+      </div>
+
       <div id="overlay" class="overlay mode-title hidden" aria-live="polite">
         <!-- Live-grid title menu (post-splash / menu state) -->
         <div id="title-menu" class="title-menu">
@@ -103,9 +120,10 @@
           <ul id="how-to" class="how-to title-howto hidden">
             <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · click-hold fire · drag to aim</li>
             <li>Gamepad: left stick move · right stick aim · RT fire · LT bomb</li>
+            <li class="how-touch">Phone: left thumb move · right thumb aim + fire · BOMB button</li>
             <li>Kill → green <strong>geoms</strong> → scoop for ×mult (scores explode)</li>
             <li>Pink dashes · purple splitters · voids pull you in</li>
-            <li><kbd>Space</kbd> / A bomb clears (no points) · death resets mult</li>
+            <li><kbd>Space</kbd> / A bomb clears (no points) · death soft-resets mult</li>
             <li>Extra life · bomb milestones · <kbd>P</kbd> / Start pause</li>
           </ul>
         </div>
@@ -120,6 +138,10 @@
         </div>
       </div>
     </main>
+
+    <div id="portrait-hint" class="portrait-hint hidden" role="status">
+      Rotate to landscape for best twin-stick play
+    </div>
 
     <footer class="bottom-bar">
       <p class="hint">Inspired by Geometry Wars · Local high score only</p>

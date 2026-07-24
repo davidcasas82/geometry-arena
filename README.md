@@ -6,7 +6,7 @@ A **Geometry Wars–inspired** twin-stick shooter for the browser. Move with WAS
 
 **[▶ Open Geometry Arena](https://davidcasas82.github.io/geometry-arena/)**
 
-Works best on desktop or laptop with a mouse/trackpad, or a Bluetooth/USB gamepad on a TV/couch setup.
+Works on **desktop** (mouse/keyboard), **gamepad** (TV/couch), and **phone/tablet** (virtual twin-sticks — landscape recommended).
 
 ## Play locally
 
@@ -32,6 +32,17 @@ Or open `index.html` with any static file server (ES modules need a server, not 
 | Mute | `M` | **Back** / Select / Share |
 | Restart | Play Again / `R` after game over | **A** or **Start** |
 | Title PLAY | `Enter` / `Space` | **A** or **Start** |
+
+### Touch (phone / tablet)
+
+| Action | Gesture |
+|--------|---------|
+| Move | Left thumb — drag (virtual stick) |
+| Aim + fire | Right thumb — drag to aim, hold to fire |
+| Bomb | **BOMB** button |
+| Pause | **❚❚** button |
+
+Landscape is best. A rotate hint appears in portrait. Desktop mouse/keyboard and gamepad are unchanged when you’re not on a touch device.
 
 Pair a Bluetooth controller in system settings first (Xbox, DualSense, Switch Pro, 8BitDo, etc.). Press any button once so the browser can see the pad. Keyboard and gamepad work at the same time.
 

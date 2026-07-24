@@ -20,6 +20,7 @@ import {
   GEOM_MULT,
   GEOM_VACUUM_MILESTONES,
   GFX,
+  TOUCH_MAX_DPR,
   GRID_IMPULSE_MAX,
   HS_KEY,
   INVULN_MS,
@@ -207,8 +208,12 @@ export class Game {
     this.canvas.style.width = `${cssW}px`;
     this.canvas.style.height = `${cssH}px`;
 
-    // Retina / HiDPI backing store (capped)
-    const dpr = Math.min(window.devicePixelRatio || 1, GFX.MAX_DPR);
+    // Retina / HiDPI backing store (capped; lower on touch UI for heat/battery)
+    const touchUi =
+      typeof document !== "undefined" &&
+      document.body?.classList?.contains("touch-ui");
+    const dprCap = touchUi ? Math.min(GFX.MAX_DPR, TOUCH_MAX_DPR) : GFX.MAX_DPR;
+    const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
     this.dpr = dpr;
     const bw = Math.max(1, Math.round(WORLD_W * dpr));
     const bh = Math.max(1, Math.round(WORLD_H * dpr));
