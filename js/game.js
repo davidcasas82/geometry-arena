@@ -495,8 +495,8 @@ export class Game {
     this.geomVacuum = Math.max(this.geomVacuum, 0.85);
     addTrauma(this.cam, 0.14);
     punchZoom(this.cam, 0.05);
-    this.particles.ring(this.player.x, this.player.y, COLORS.geom, 40, 400);
-    this.particles.shockwave(this.player.x, this.player.y, COLORS.geom, 280);
+    // Inbound electric stream (distinct from kill/bomb ring blasts)
+    this.particles.vacuumInhale(this.player.x, this.player.y, COLORS.geom);
     this._gridPulse(this.player.x, this.player.y, 1.8);
     this.particles.floater(
       this.player.x,
@@ -1132,7 +1132,23 @@ export class Game {
       this._advanceLevel();
     }
     this._tickMultDecay(dt);
-    if (this.geomVacuum > 0) this.geomVacuum = Math.max(0, this.geomVacuum - dt);
+    if (this.geomVacuum > 0) {
+      // Keep electric stream feeding the ship while vacuum is hot
+      this.particles.vacuumSustain(
+        this.player.x,
+        this.player.y,
+        COLORS.geom,
+        this.geomVacuum
+      );
+      // Attract-stream targets track the ship if you move during vacuum
+      for (const p of this.particles.particles) {
+        if (p.attract) {
+          p.tx = this.player.x;
+          p.ty = this.player.y;
+        }
+      }
+      this.geomVacuum = Math.max(0, this.geomVacuum - dt);
+    }
     if (this.clearCooldown > 0) this.clearCooldown = Math.max(0, this.clearCooldown - dt);
 
     let move = this.input.moveVector();
