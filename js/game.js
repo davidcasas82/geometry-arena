@@ -493,18 +493,33 @@ export class Game {
         ? `${Math.floor(run.elapsed / 60)}m ${run.elapsed % 60}s`
         : `${run.elapsed}s`;
     const summary = formatRunsSummary(recent.slice(0, 5));
-    this.ui.showOverlay(
-      "Game Over",
-      `This run: ${timeStr} · ${this.score.toLocaleString()} · peak ×${this.peakMult} · ${this.deathCount} death(s)\nBest ${this.best.toLocaleString()}\n\nLast runs:\n${summary}`,
-      false,
-      "Play Again",
-      () => this.start(),
-      {
-        showTitle: true,
+    // Logo-style game over on the live grid (no boilerplate panel)
+    if (typeof this.ui.showGameOver === "function") {
+      this.ui.showGameOver({
+        score: this.score,
+        best: this.best,
+        peakMult: this.peakMult,
+        timeStr,
+        deaths: this.deathCount,
+        level: this.level,
+        runsSummary: summary,
+        onAgain: () => this.start(),
         onTitle: () => this.returnToMenu(),
-        showHelp: false,
-      }
-    );
+      });
+    } else {
+      this.ui.showOverlay(
+        "Game Over",
+        `This run: ${timeStr} · ${this.score.toLocaleString()} · peak ×${this.peakMult} · ${this.deathCount} death(s)\nBest ${this.best.toLocaleString()}\n\nLast runs:\n${summary}`,
+        false,
+        "Play Again",
+        () => this.start(),
+        {
+          showTitle: true,
+          onTitle: () => this.returnToMenu(),
+          showHelp: false,
+        }
+      );
+    }
   }
 
   /**

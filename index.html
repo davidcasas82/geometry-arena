@@ -128,7 +128,7 @@
           </ul>
         </div>
 
-        <!-- Interrupt card: pause / game over only -->
+        <!-- Interrupt card: pause only -->
         <div id="interrupt-panel" class="panel interrupt-panel hidden">
           <div class="panel-glow"></div>
           <h2 id="overlay-title">Paused</h2>
@@ -148,6 +148,43 @@
             <li><kbd>Space</kbd> / A bomb clears (no points) · death soft-resets mult</li>
             <li>Extra life · bomb milestones · <kbd>P</kbd> / Start pause</li>
           </ul>
+        </div>
+
+        <!-- Classic chrome GAME OVER (no boilerplate box) -->
+        <div id="gameover-menu" class="gameover-menu hidden" role="dialog" aria-label="Game over">
+          <div class="gameover-logo" aria-hidden="true">
+            <span class="gameover-line gameover-game"><span class="gameover-fill">GAME</span></span>
+            <span class="gameover-line gameover-over"><span class="gameover-fill">OVER</span></span>
+          </div>
+          <p class="gameover-tag">NEON SWARM DOWN</p>
+
+          <div class="gameover-stats" aria-live="polite">
+            <div class="go-stat">
+              <span class="go-label">SCORE</span>
+              <span id="go-score" class="go-value">0</span>
+            </div>
+            <div class="go-stat accent">
+              <span class="go-label">PEAK</span>
+              <span id="go-peak" class="go-value">×1</span>
+            </div>
+            <div class="go-stat">
+              <span class="go-label">TIME</span>
+              <span id="go-time" class="go-value">0s</span>
+            </div>
+            <div class="go-stat">
+              <span class="go-label">BEST</span>
+              <span id="go-best" class="go-value">0</span>
+            </div>
+          </div>
+
+          <p id="go-meta" class="gameover-meta"></p>
+          <pre id="go-runs" class="gameover-runs" hidden></pre>
+
+          <div class="gameover-actions">
+            <button id="go-again-btn" class="btn arcade" type="button">PLAY AGAIN</button>
+            <button id="go-title-btn" class="btn secondary go-title-btn" type="button">TITLE</button>
+          </div>
+          <p class="gameover-hint">R · A / START RESTART</p>
         </div>
       </div>
     </main>

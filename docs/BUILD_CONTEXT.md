@@ -157,11 +157,14 @@ Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu stil
 
 ### 3. Interrupt panel (`#interrupt-panel`, overlay `mode-panel`)
 
-- **Pause** and **Game Over** only
-- Harder frame + Press Start-style title + arcade primary button
-- Pause: **Resume** + **HOW TO PLAY** (panel help, same tips as title)
-- Game over: **Play Again** + **Title** (`returnToMenu` → live-grid title)
-- Game over shows run summary + recent runs text
+- **Pause only** (harder frame + arcade Resume + HOW TO PLAY)
+
+### 3b. Game over (`#gameover-menu`, overlay `mode-gameover`)
+
+- **No boilerplate box** — chrome **GAME / OVER** wordmark on the live grid (same logo language as title/splash)
+- Stat chips: Score · Peak × · Time · Best
+- **PLAY AGAIN** + **TITLE** integrated under the mark (`showGameOver` in `main.js`)
+- Optional recent-runs text; restart still via `R` / gamepad A-Start
 
 ### 4. Header HUD
 

@@ -24,6 +24,15 @@ const howTo = document.getElementById("how-to");
 const panelHowto = document.getElementById("panel-howto");
 const titleMenu = document.getElementById("title-menu");
 const interruptPanel = document.getElementById("interrupt-panel");
+const gameoverMenu = document.getElementById("gameover-menu");
+const goAgainBtn = document.getElementById("go-again-btn");
+const goTitleBtn = document.getElementById("go-title-btn");
+const goScoreEl = document.getElementById("go-score");
+const goPeakEl = document.getElementById("go-peak");
+const goTimeEl = document.getElementById("go-time");
+const goBestEl = document.getElementById("go-best");
+const goMetaEl = document.getElementById("go-meta");
+const goRunsEl = document.getElementById("go-runs");
 const splash = document.getElementById("splash");
 const touchControls = document.getElementById("touch-controls");
 const portraitHint = document.getElementById("portrait-hint");
@@ -80,8 +89,10 @@ function setOverlayMode(mode) {
   if (!overlay) return;
   overlay.classList.toggle("mode-title", mode === "title");
   overlay.classList.toggle("mode-panel", mode === "panel");
+  overlay.classList.toggle("mode-gameover", mode === "gameover");
   titleMenu?.classList.toggle("hidden", mode !== "title");
   interruptPanel?.classList.toggle("hidden", mode !== "panel");
+  gameoverMenu?.classList.toggle("hidden", mode !== "gameover");
 }
 
 function resetPanelHelp() {
@@ -101,6 +112,7 @@ function showTitleMenu() {
   titleBtn?.classList.add("hidden");
   resumeBtn?.classList.add("hidden");
   panelHelpBtn?.classList.add("hidden");
+  if (gameoverMenu) gameoverMenu.classList.remove("entering");
 
   setOverlayMode("title");
   if (titleMenu) {
@@ -140,10 +152,13 @@ const ui = {
     resetPanelHelp();
     titleBtn?.classList.add("hidden");
     titleAction = null;
+    pendingAction = null;
+    gameoverMenu?.classList.add("hidden");
+    if (gameoverMenu) gameoverMenu.classList.remove("entering");
     syncTouchChrome();
   },
   /**
-   * Interrupt UIs only (pause / game over). Title menu uses showTitleMenu.
+   * Interrupt UIs only (pause). Title menu uses showTitleMenu; game over uses showGameOver.
    * @param {{ showTitle?: boolean, onTitle?: function|null, showHelp?: boolean }} [opts]
    */
   showOverlay(
@@ -184,6 +199,49 @@ const ui = {
     howTo?.classList.add("hidden");
     setOverlayMode("panel");
     overlay.classList.remove("hidden");
+    syncTouchChrome();
+  },
+  /**
+   * Logo-style game over on the live grid (no boilerplate box).
+   * @param {{ score:number, best:number, peakMult:number, timeStr:string, deaths:number, level:number, runsSummary?:string, onAgain:function, onTitle:function }}
+   */
+  showGameOver(data) {
+    pendingAction = typeof data.onAgain === "function" ? data.onAgain : null;
+    titleAction = typeof data.onTitle === "function" ? data.onTitle : null;
+
+    if (goScoreEl) goScoreEl.textContent = format(data.score || 0);
+    if (goPeakEl) goPeakEl.textContent = `×${Math.floor(data.peakMult || 1)}`;
+    if (goTimeEl) goTimeEl.textContent = data.timeStr || "0s";
+    if (goBestEl) goBestEl.textContent = format(data.best || 0);
+    if (goMetaEl) {
+      const deaths = data.deaths ?? 0;
+      const level = data.level ?? 1;
+      goMetaEl.textContent = `LVL ${level}  ·  ${deaths} DEATH${deaths === 1 ? "" : "S"}`;
+    }
+    if (goRunsEl) {
+      const summary = (data.runsSummary || "").trim();
+      if (summary) {
+        goRunsEl.textContent = summary;
+        goRunsEl.classList.remove("hidden");
+      } else {
+        goRunsEl.textContent = "";
+        goRunsEl.classList.add("hidden");
+      }
+    }
+
+    howTo?.classList.add("hidden");
+    resetPanelHelp();
+    titleBtn?.classList.add("hidden");
+    resumeBtn?.classList.add("hidden");
+    panelHelpBtn?.classList.add("hidden");
+
+    setOverlayMode("gameover");
+    if (gameoverMenu) {
+      gameoverMenu.classList.remove("entering");
+      void gameoverMenu.offsetWidth;
+      gameoverMenu.classList.add("entering");
+    }
+    overlay?.classList.remove("hidden");
     syncTouchChrome();
   },
   showTitleMenu,
@@ -305,8 +363,18 @@ function onPrimaryAction() {
 
 startBtn?.addEventListener("click", onPrimaryAction);
 interruptBtn?.addEventListener("click", onPrimaryAction);
+goAgainBtn?.addEventListener("click", onPrimaryAction);
 
 titleBtn?.addEventListener("click", () => {
+  if (typeof titleAction === "function") {
+    const fn = titleAction;
+    titleAction = null;
+    fn();
+    syncTouchChrome();
+  }
+});
+
+goTitleBtn?.addEventListener("click", () => {
   if (typeof titleAction === "function") {
     const fn = titleAction;
     titleAction = null;
