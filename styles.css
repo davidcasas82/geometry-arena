@@ -644,8 +644,10 @@ body {
   justify-content: center;
   width: 100%;
   line-height: 0.88;
-  gap: 0.04em;
-  filter: drop-shadow(0 0 36px rgba(255, 60, 120, 0.35));
+  gap: 0.06em;
+  /* Outer neon halo only — keep face chrome on the fill */
+  filter: drop-shadow(0 0 22px rgba(125, 249, 255, 0.28))
+    drop-shadow(0 0 48px rgba(255, 60, 140, 0.32));
 }
 
 .gameover-line {
@@ -657,7 +659,6 @@ body {
   font-style: italic;
   letter-spacing: 0.01em;
   text-transform: uppercase;
-  -webkit-text-stroke: 0.6px rgba(0, 0, 0, 0.4);
 }
 
 .gameover-game {
@@ -668,46 +669,74 @@ body {
   font-size: clamp(3rem, 13vw, 6.8rem);
 }
 
+/*
+ * Same chrome stack as title logo: extruded black depth + bright face gradient.
+ * Keep fill filter light so the gradient layer actually reads (was too muddy).
+ */
 .gameover-fill {
   display: inline-block;
+  position: relative;
   text-shadow:
-    1px 1px 0 #2a0610,
-    2px 2px 0 #1a040c,
-    3px 3px 0 #120308,
-    4px 5px 0 #0a0206,
-    6px 8px 0 rgba(0, 0, 0, 0.55),
-    0 0 28px rgba(255, 80, 140, 0.45),
-    0 0 60px rgba(180, 40, 255, 0.28);
+    1px 1px 0 #1a0a30,
+    2px 2px 0 #140828,
+    3px 3px 0 #100620,
+    4px 4px 0 #0c0418,
+    5px 5px 0 #080310,
+    6px 7px 0 #050208,
+    8px 10px 0 rgba(0, 0, 0, 0.55),
+    0 0 28px rgba(125, 249, 255, 0.35),
+    0 0 56px rgba(255, 60, 140, 0.3);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
 }
 
+/* GAME — cyan → electric blue → violet (arena chrome) */
 .gameover-game .gameover-fill {
   background-image: linear-gradient(
     180deg,
-    #fff0f5 0%,
-    #ffb0c8 12%,
-    #ff4d7a 38%,
-    #ff2048 62%,
-    #a010ff 88%,
-    #4a08a0 100%
+    #f0ffff 0%,
+    #b8ffff 10%,
+    #7df9ff 22%,
+    #3ad4ff 38%,
+    #4a7cff 55%,
+    #b04aff 78%,
+    #ff4ac8 100%
   );
-  filter: drop-shadow(0 -2px 0 #ffd0e0);
+  filter: drop-shadow(0 -1px 0 #e8ffff);
 }
 
+/* OVER — yellow → orange → magenta (title GEOMETRY energy) */
 .gameover-over .gameover-fill {
   background-image: linear-gradient(
     180deg,
-    #fff8d0 0%,
-    #ffe14a 14%,
-    #ff8a1a 40%,
+    #fff8c8 0%,
+    #ffe14a 12%,
+    #ffb020 28%,
+    #ff6a1a 48%,
     #ff2d6a 68%,
-    #c020ff 92%,
-    #6010a0 100%
+    #c020ff 88%,
+    #6a20ff 100%
   );
-  filter: drop-shadow(0 -2px 0 #fff0a8);
+  filter: drop-shadow(0 -1px 0 #fff6a0);
+}
+
+/* Soft shine sweep so the face reads as polished chrome */
+.gameover-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 28%,
+    rgba(255, 255, 255, 0.42) 46%,
+    transparent 58%
+  );
+  mix-blend-mode: overlay;
+  animation: logo-shine 4.5s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: 2px;
 }
 
 .gameover-tag {
@@ -723,16 +752,18 @@ body {
 
 .gameover-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* BEST gets a wider column so 7-digit highs stay in the chip */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr) minmax(0, 0.85fr) minmax(0, 1.35fr);
   gap: 8px;
   margin-top: 1.25rem;
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
 }
 
 .go-stat {
   min-width: 0;
-  padding: 10px 8px 8px;
+  overflow: hidden;
+  padding: 10px 6px 8px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.42);
   border: 2px solid rgba(255, 100, 150, 0.28);
@@ -748,20 +779,27 @@ body {
 .go-label {
   display: block;
   font-family: "Press Start 2P", monospace;
-  font-size: 0.38rem;
-  letter-spacing: 0.14em;
+  font-size: 0.36rem;
+  letter-spacing: 0.12em;
   color: #9aa6c4;
   margin-bottom: 6px;
 }
 
 .go-value {
   display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--display);
   font-weight: 800;
-  font-size: clamp(1.05rem, 2.8vw, 1.45rem);
+  /* Fluid — stays inside chips even at 7–9 digit scores */
+  font-size: clamp(0.7rem, 1.7vw, 1.12rem);
   color: #fff;
-  letter-spacing: 0.02em;
-  line-height: 1.1;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
   text-shadow: 0 0 12px rgba(255, 120, 180, 0.35);
 }
 
@@ -850,16 +888,16 @@ body.touch-ui .gameover-over {
 body.touch-ui .gameover-stats {
   gap: 6px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  max-width: 320px;
+  max-width: 340px;
 }
 
 body.touch-ui .go-stat {
   min-width: 0;
-  padding: 7px 8px 6px;
+  padding: 7px 6px 6px;
 }
 
 body.touch-ui .go-value {
-  font-size: 1rem;
+  font-size: clamp(0.72rem, 3.2vw, 0.95rem);
 }
 
 body.touch-ui .gameover-runs {
