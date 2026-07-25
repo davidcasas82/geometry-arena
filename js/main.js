@@ -87,12 +87,21 @@ function setBestDisplays(n) {
 
 function setOverlayMode(mode) {
   if (!overlay) return;
-  overlay.classList.toggle("mode-title", mode === "title");
-  overlay.classList.toggle("mode-panel", mode === "panel");
-  overlay.classList.toggle("mode-gameover", mode === "gameover");
+  // Exclusive modes — never leave two mode-* classes active
+  overlay.classList.remove("mode-title", "mode-panel", "mode-gameover");
+  if (mode === "title" || mode === "panel" || mode === "gameover") {
+    overlay.classList.add(`mode-${mode}`);
+  }
+  // Belt-and-suspenders: only the active panel is un-hidden
   titleMenu?.classList.toggle("hidden", mode !== "title");
   interruptPanel?.classList.toggle("hidden", mode !== "panel");
   gameoverMenu?.classList.toggle("hidden", mode !== "gameover");
+  if (mode !== "gameover" && gameoverMenu) {
+    gameoverMenu.classList.remove("entering");
+  }
+  if (mode !== "title" && titleMenu) {
+    titleMenu.classList.remove("entering");
+  }
 }
 
 function resetPanelHelp() {
