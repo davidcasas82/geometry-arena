@@ -332,6 +332,77 @@ test("enemy seeks player over time", () => {
   assert.ok(dist1 < dist0, `should approach player ${dist0} -> ${dist1}`);
 });
 
+// --- Phrase director / formations ---
+test("opening phrase is wanderer-only readable patterns", async () => {
+  const {
+    buildPhrase,
+    formationEdgeLine,
+    formationPlayerCircle,
+    filterJobsNearPlayer,
+  } = await import(js("spawns.js"));
+  const { SAFE_OPENING_SEC, WORLD_W, WORLD_H, PHRASE } = await import(js("constants.js"));
+
+  for (let i = 0; i < 40; i++) {
+    const p = buildPhrase(5, 0, () => "pink", { safeOpening: SAFE_OPENING_SEC });
+    assert.ok(p.beats.length >= 1, "has beats");
+    assert.equal(p.intensity, "soft");
+    for (const beat of p.beats) {
+      for (const job of beat) {
+        assert.equal(job.type, "wanderer", `opening must be wanderer, got ${job.type}`);
+        assert.ok(Number.isFinite(job.x) && Number.isFinite(job.y));
+        assert.ok(job.delay >= 0);
+      }
+    }
+  }
+
+  // sanity: edge line exists
+  const line = formationEdgeLine("diamond", 5, 0, 0.1);
+  assert.equal(line.length, 5);
+  assert.ok(line.every((j) => j.y < 0), "top line above arena");
+
+  // player circle keeps radius around player
+  const circ = formationPlayerCircle("wanderer", 10, WORLD_W / 2, WORLD_H / 2, 160, 0.02);
+  assert.ok(circ.length >= 6);
+  for (const j of circ) {
+    const d = Math.hypot(j.x - WORLD_W / 2, j.y - WORLD_H / 2);
+    assert.ok(Math.abs(d - 160) < 2, `circle radius ${d}`);
+  }
+
+  // filter drops near-player jobs
+  const player = { x: 100, y: 100 };
+  const risky = [
+    { type: "wanderer", x: 100, y: 100, delay: 0 },
+    { type: "wanderer", x: 500, y: 500, delay: 0 },
+  ];
+  const safe = filterJobsNearPlayer(risky, player, PHRASE.SAFE_SPAWN_DIST);
+  assert.equal(safe.length, 1);
+  assert.equal(safe[0].x, 500);
+});
+
+test("first pink intro fires once then is marked via introKey", async () => {
+  const { buildPhrase } = await import(js("spawns.js"));
+  const seen = new Set();
+  const first = buildPhrase(36, 0.1, () => "wanderer", {
+    seenIntros: seen,
+    player: { x: 800, y: 450, invuln: 0, controlLock: 0 },
+  });
+  assert.equal(first.introKey, "pink");
+  assert.ok(first.beats.some((b) => b.some((j) => j.type === "pink")));
+  seen.add("pink");
+  // After seen, should not re-intro pink forever
+  let pinkIntroAgain = 0;
+  for (let i = 0; i < 30; i++) {
+    const p = buildPhrase(36, 0.1, () => "wanderer", {
+      seenIntros: seen,
+      player: { x: 800, y: 450, invuln: 0, controlLock: 0 },
+      lastCircleAt: 9999,
+      lastFloodAt: 9999,
+    });
+    if (p.introKey === "pink") pinkIntroAgain += 1;
+  }
+  assert.equal(pinkIntroAgain, 0, "pink intro should not repeat");
+});
+
 // Simulate short combat loop
 test("combat sim: hold fire kills nearby wanderer", () => {
   const p = createPlayer(400, 360);

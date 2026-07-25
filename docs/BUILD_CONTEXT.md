@@ -2,7 +2,7 @@
 
 **Purpose:** handoff doc so a new session (human or agent) can resume development without re-discovering architecture, product decisions, and past failure modes.
 
-**Last updated:** 2026-07-25  
+**Last updated:** 2026-07-25 (phrase wave director)  
 **Project root:** `geometry-arena/` (under `My Dev Folder`)  
 **Stack:** vanilla HTML / CSS / ES modules, Canvas 2D, Web Audio SFX + HTMLAudio BGM, `localStorage` only (no backend)
 
@@ -264,6 +264,7 @@ These were discussed or are natural next steps — pick when product asks:
  
 - Canvas is letterboxed inside `.stage-wrap`; `fitCanvas()` maps display size for input.  
 - Formation spawns are queued jobs in `spawns.js`, drained by `game.js`.
+- **Phrase director:** `buildPhrase()` returns themed multi-beat phrases (intros, money lines, pincers, floods, player-circles). `Game` holds `phraseBeats` / `seenIntros` / circle+flood cooldowns; lulls scale by phrase intensity (`PHRASE.LULL_SCALE`).
 
 ---
 

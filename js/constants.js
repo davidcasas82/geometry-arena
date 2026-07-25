@@ -100,6 +100,34 @@ export const WAVE_LULL_START = 1.4;
 export const WAVE_LULL_MIN = 0.42;
 
 /**
+ * Phrase-based wave director (GW cadence).
+ * Scripted beats + intensity-scaled lulls; improvisation after intros land.
+ */
+export const PHRASE = {
+  /** Gap between multi-beat phrase halves (seconds) */
+  BEAT_GAP: 0.55,
+  /** Player-circle ambush */
+  CIRCLE_MIN_ELAPSED: 55,
+  CIRCLE_COOLDOWN: 28,
+  CIRCLE_RADIUS: 165,
+  CIRCLE_COUNT_MIN: 8,
+  CIRCLE_COUNT_MAX: 14,
+  /** 4-corner flood (jacks-like path cut) */
+  FLOOD_MIN_ELAPSED: 70,
+  FLOOD_COOLDOWN: 32,
+  FLOOD_PER_CORNER: 4,
+  /** Min distance from player for any job spawn point */
+  SAFE_SPAWN_DIST: 110,
+  /** Lull multipliers by phrase intensity tag */
+  LULL_SCALE: {
+    soft: 0.85,
+    normal: 1,
+    hard: 1.35,
+    setpiece: 1.55,
+  },
+};
+
+/**
  * Soft enemy caps by elapsed time (anti-flood, keeps formations readable).
  * Tuned so mid-game (45–90s) has teeth without becoming soup.
  */

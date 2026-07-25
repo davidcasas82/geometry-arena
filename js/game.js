@@ -35,6 +35,7 @@ import {
   MULT_FOR_TRIPLE,
   MULT_IDLE_BEFORE_DECAY,
   MULT_MAX,
+  PHRASE,
   SAFE_OPENING_SEC,
   SOFT_CAP,
   SPAWN_INTERVAL_MIN,
@@ -82,7 +83,7 @@ import {
   recordDeath,
   recordRun,
 } from "./runs.js";
-import { buildWaveJobs } from "./spawns.js";
+import { buildPhrase, filterJobsNearPlayer } from "./spawns.js";
 import {
   drawAfterimages,
   drawAimReticle,
@@ -143,6 +144,15 @@ export class Game {
     this.waveLeft = 0;
     /** @type {import('./spawns.js').SpawnJob[]} */
     this.spawnQueue = [];
+    /** @type {import('./spawns.js').SpawnJob[][]} remaining beats in active phrase */
+    this.phraseBeats = [];
+    /** @type {string|null} */
+    this.phraseTag = null;
+    this.phraseLullScale = 1;
+    /** First-unlock set pieces already shown this run */
+    this.seenIntros = new Set();
+    this.lastCircleAt = -999;
+    this.lastFloodAt = -999;
     this.cam = createCamera();
     this.bombFlash = 0;
     this.nextLifeAt = EXTRA_LIFE_EVERY;
@@ -278,6 +288,12 @@ export class Game {
     this.spawnTimer = 1.2; // first enemies after a beat
     this.waveLeft = 0;
     this.spawnQueue = [];
+    this.phraseBeats = [];
+    this.phraseTag = null;
+    this.phraseLullScale = 1;
+    this.seenIntros = new Set();
+    this.lastCircleAt = -999;
+    this.lastFloodAt = -999;
     this.bombFlash = 0;
     this.nextLifeAt = EXTRA_LIFE_EVERY;
     this.nextBombAt = EXTRA_BOMB_EVERY;
@@ -370,6 +386,12 @@ export class Game {
     this.geoms = [];
     this.gridImpulses = [];
     this.spawnQueue = [];
+    this.phraseBeats = [];
+    this.phraseTag = null;
+    this.phraseLullScale = 1;
+    this.seenIntros = new Set();
+    this.lastCircleAt = -999;
+    this.lastFloodAt = -999;
     this.waveLeft = 0;
     this.bombFlash = 0;
     this.afterimages = [];
@@ -728,8 +750,14 @@ export class Game {
     return type;
   }
 
+  _phraseLull() {
+    const scale = this.phraseLullScale || 1;
+    return (this._waveLull() + this._spawnInterval() * 0.35) * scale;
+  }
+
   /**
    * Drain formation queue: staggered entry keeps rows readable.
+   * When a beat ends, either load the next phrase beat or apply intensity lull.
    */
   _drainSpawnQueue(dt, softCap) {
     if (!this.spawnQueue.length) return false;
@@ -745,9 +773,12 @@ export class Game {
       const job = this.spawnQueue.shift();
       let type = job.type;
       // Specials that shouldn't mass-spawn
-      if (type === "void" || type === "tank") {
-        // Only first of wave may be special; rest become wanderers/diamonds
-        if (spawned > 0 || this.enemies.some((e) => e.type === "void" && type === "void")) {
+      if (type === "void" || type === "tank" || type === "snake") {
+        if (
+          spawned > 0 ||
+          (type === "void" && this.enemies.some((e) => e.type === "void")) ||
+          (type === "snake" && this.enemies.filter((e) => e.type === "snake").length >= 2)
+        ) {
           type = type === "void" ? "diamond" : "wanderer";
         }
       }
@@ -755,11 +786,14 @@ export class Game {
       if (e) {
         if (job.approach) {
           e.approach = job.approach;
-          // Hold formation 0.45–0.9s while drifting in (longer early)
+          // Hold formation while drifting in (longer early / circle closes)
+          const circle = this.phraseTag === "circle";
           e.approachTime =
             this.elapsed < SAFE_OPENING_SEC
               ? 0.85
-              : 0.45 + Math.random() * 0.25;
+              : circle
+                ? 0.55 + Math.random() * 0.15
+                : 0.45 + Math.random() * 0.25;
         }
         this.enemies.push(e);
         spawned += 1;
@@ -767,18 +801,42 @@ export class Game {
     }
 
     if (this.spawnQueue.length) {
-      // Next job soon
       this.spawnTimer = Math.max(0.02, this.spawnQueue[0].delay);
       return true;
     }
-    // Wave finished — lull before next formation
-    this.spawnTimer = this._waveLull() + this._spawnInterval() * 0.4;
+
+    // Beat finished — brief gap, then next phrase beat (handled in _trySpawn)
+    if (this.phraseBeats.length) {
+      this.spawnTimer = PHRASE.BEAT_GAP;
+      return true;
+    }
+
+    // Phrase finished — intensity-scaled lull
+    this.spawnTimer = this._phraseLull();
+    this.phraseTag = null;
     return true;
   }
 
+  /** Queue next beat from the active phrase (trim to soft-cap room). */
+  _loadNextPhraseBeat(softCap) {
+    while (this.phraseBeats.length) {
+      let beat = this.phraseBeats.shift();
+      beat = filterJobsNearPlayer(beat, this.player, PHRASE.SAFE_SPAWN_DIST * 0.85);
+      const room = Math.max(0, softCap - this.enemies.length);
+      this.spawnQueue = beat.slice(0, room);
+      if (this.spawnQueue.length) {
+        this._drainSpawnQueue(0, softCap);
+        return true;
+      }
+    }
+    this.spawnTimer = this._phraseLull();
+    this.phraseTag = null;
+    return false;
+  }
+
   /**
-   * Wave director: formation-based entry (lines, columns, pincers, rings).
-   * Patterns exist so sweeping fire can clear whole rows — GW juice.
+   * Phrase director: themed beats (money lines, pincers, intros, floods)
+   * with sawtooth lulls — GW cadence instead of independent random rolls.
    */
   _trySpawn(dt) {
     const softCap = this._softCap();
@@ -786,6 +844,18 @@ export class Game {
     // Always drain active formation first
     if (this.spawnQueue.length) {
       this._drainSpawnQueue(dt, softCap);
+      return;
+    }
+
+    // Between beats of a multi-beat phrase
+    if (this.phraseBeats.length) {
+      this.spawnTimer -= dt;
+      if (this.spawnTimer > 0) return;
+      if (this.enemies.length >= softCap) {
+        this.spawnTimer = 0.45;
+        return;
+      }
+      this._loadNextPhraseBeat(softCap);
       return;
     }
 
@@ -798,43 +868,56 @@ export class Game {
     }
 
     const d = this._difficulty01();
-
-    // Occasional solo void (not in a ring of voids)
-    if (
-      this.elapsed > 105 &&
-      Math.random() < 0.07 + d * 0.06 &&
-      !this.enemies.some((e) => e.type === "void")
-    ) {
-      const e = spawnEnemy("void", this.elapsed);
-      if (e) {
-        e.approachTime = 0.3;
-        e.approach = { x: Math.sign(WORLD_W / 2 - e.x) || 1, y: Math.sign(WORLD_H / 2 - e.y) || 0 };
-        // normalize
-        const L = Math.hypot(e.approach.x, e.approach.y) || 1;
-        e.approach.x /= L;
-        e.approach.y /= L;
-        this.enemies.push(e);
-      }
-      this.spawnTimer = this._waveLull() * 1.2;
-      return;
-    }
-
-    // Build a full formation wave
-    const jobs = buildWaveJobs(this.elapsed, d, () => this._pickType(), {
+    const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
       safeOpening: SAFE_OPENING_SEC,
+      player: this.player,
+      seenIntros: this.seenIntros,
+      lastCircleAt: this.lastCircleAt,
+      lastFloodAt: this.lastFloodAt,
+      enemyCount: this.enemies.length,
+      hasVoid: this.enemies.some((e) => e.type === "void"),
     });
 
-    // Cap formation size to remaining soft cap
-    const room = Math.max(0, softCap - this.enemies.length);
-    this.spawnQueue = jobs.slice(0, room);
-
-    if (!this.spawnQueue.length) {
-      this.spawnTimer = 0.5;
-      return;
+    // Track intros / cooldowns
+    if (phrase.introKey) {
+      if (
+        phrase.introKey === "pink" ||
+        phrase.introKey === "spinner" ||
+        phrase.introKey === "pincer" ||
+        phrase.introKey === "splitter" ||
+        phrase.introKey === "snake" ||
+        phrase.introKey === "tank" ||
+        phrase.introKey === "void"
+      ) {
+        this.seenIntros.add(phrase.introKey);
+      }
+      if (phrase.tag === "circle" || phrase.introKey === "circle-event") {
+        this.lastCircleAt = this.elapsed;
+      }
+      if (phrase.tag === "flood" || phrase.introKey === "flood-event") {
+        this.lastFloodAt = this.elapsed;
+      }
+    } else if (phrase.tag === "circle") {
+      this.lastCircleAt = this.elapsed;
+    } else if (phrase.tag === "flood") {
+      this.lastFloodAt = this.elapsed;
     }
 
-    // Kick drain immediately
-    this._drainSpawnQueue(0, softCap);
+    this.phraseTag = phrase.tag;
+    this.phraseLullScale = PHRASE.LULL_SCALE[phrase.intensity] ?? 1;
+    this.phraseBeats = phrase.beats.map((b) => b.slice());
+
+    if (phrase.label) {
+      this.particles.floater(
+        this.player.x,
+        this.player.y - 52,
+        phrase.label,
+        COLORS.bomb,
+        1.15
+      );
+    }
+
+    this._loadNextPhraseBeat(softCap);
   }
 
   _dropGeoms(enemy) {
