@@ -8,6 +8,7 @@
  *   - aim bias (lean into where you're shooting)
  *   - trauma shake (decaying multi-frequency, not pure random)
  *   - fire recoil kick + impact zoom punches
+ *   - edge zoom-out + hard "keep ship visible" clamp (walls never eat the player)
  *
  * This keeps the full arena readable while selling motion and hits.
  */
@@ -17,7 +18,9 @@ import { WORLD_H, WORLD_W } from "./constants.js";
 export const CAM = {
   /** Base zoom (>1 crops slightly so pan/look-ahead is visible) */
   BASE_ZOOM: 1.1,
-  MIN_ZOOM: 1.04,
+  /** Floor zoom near arena edges — keeps the ship framed */
+  EDGE_ZOOM: 1.0,
+  MIN_ZOOM: 1.0,
   MAX_ZOOM: 1.22,
   /** How fast the camera catches the player (higher = snappier) */
   FOLLOW: 6.5,
@@ -25,6 +28,12 @@ export const CAM = {
   LOOKAHEAD: 0.14,
   /** Aim direction bias (world units at full aim unit vector) */
   AIM_BIAS: 38,
+  /** World px from wall where we start zooming out / killing look-ahead */
+  EDGE_SOFT: 200,
+  /** Keep at least this much ship padding inside the visible frame */
+  PLAYER_MARGIN: 40,
+  /** Allow this much void past the arena when tracking an edge ship */
+  VOID_PAD: 72,
   /** Zoom recovery speed */
   ZOOM_FOLLOW: 5,
   /**
@@ -111,36 +120,93 @@ export function recoil(cam, angle, strength = CAM.RECOIL) {
 }
 
 /**
+ * 0 at center, 1 when within EDGE_SOFT of a wall (per axis then max).
+ */
+function edgeProximity(player) {
+  const s = CAM.EDGE_SOFT;
+  const ex = Math.max(0, Math.max(s - player.x, player.x - (WORLD_W - s)) / s);
+  const ey = Math.max(0, Math.max(s - player.y, player.y - (WORLD_H - s)) / s);
+  return Math.max(0, Math.min(1, Math.max(ex, ey)));
+}
+
+/**
+ * Visible half-extents in world units for the *on-screen* frame.
+ * `visFrac*` < 1 when CSS cover-crop clips the canvas (phones).
+ */
+function visibleHalf(zoom, visFracX = 1, visFracY = 1) {
+  const z = Math.max(0.5, zoom);
+  return {
+    halfW: (WORLD_W / (2 * z)) * Math.max(0.35, Math.min(1, visFracX)),
+    halfH: (WORLD_H / (2 * z)) * Math.max(0.35, Math.min(1, visFracY)),
+  };
+}
+
+/**
+ * Keep the ship inside the visible frame. Wins over arena-fill clamps.
+ */
+function clampToKeepPlayerVisible(tx, ty, player, halfW, halfH) {
+  const m = CAM.PLAYER_MARGIN + (player.r || 0);
+  // Visible world is [cam ± half]. Player must stay inside with margin.
+  // => cam ∈ [player - half + m, player + half - m]
+  const minX = player.x - halfW + m;
+  const maxX = player.x + halfW - m;
+  const minY = player.y - halfH + m;
+  const maxY = player.y + halfH - m;
+  // If the visible frame is smaller than the ship pad, just lock on player
+  const x =
+    minX > maxX ? player.x : Math.max(minX, Math.min(maxX, tx));
+  const y =
+    minY > maxY ? player.y : Math.max(minY, Math.min(maxY, ty));
+  return { x, y };
+}
+
+/** Soft limit how far past the arena the view may drift. */
+function clampVoid(tx, ty, halfW, halfH) {
+  const pad = CAM.VOID_PAD;
+  return {
+    x: Math.max(halfW - pad, Math.min(WORLD_W - halfW + pad, tx)),
+    y: Math.max(halfH - pad, Math.min(WORLD_H - halfH + pad, ty)),
+  };
+}
+
+/**
  * @param {object} cam
- * @param {{x:number,y:number,vx?:number,vy?:number}} player
+ * @param {{x:number,y:number,vx?:number,vy?:number,r?:number}} player
  * @param {{x:number,y:number}|null} aim unit aim vector
  * @param {number} dt
+ * @param {{visFracX?:number,visFracY?:number}|null} [view]
+ *        Fraction of the canvas actually on-screen (cover-fit crop).
  */
-export function updateCamera(cam, player, aim, dt) {
+export function updateCamera(cam, player, aim, dt, view = null) {
   cam.time += dt;
 
-  const lookX = (player.vx || 0) * CAM.LOOKAHEAD;
-  const lookY = (player.vy || 0) * CAM.LOOKAHEAD;
-  const aimX = aim ? aim.x * CAM.AIM_BIAS : 0;
-  const aimY = aim ? aim.y * CAM.AIM_BIAS : 0;
+  const visFracX = view?.visFracX ?? 1;
+  const visFracY = view?.visFracY ?? 1;
+  const edge = edgeProximity(player);
+  // Kill look-ahead / aim lean into walls so we don't push the ship off-frame
+  const leadScale = 1 - edge * 0.92;
+
+  const lookX = (player.vx || 0) * CAM.LOOKAHEAD * leadScale;
+  const lookY = (player.vy || 0) * CAM.LOOKAHEAD * leadScale;
+  const aimX = aim ? aim.x * CAM.AIM_BIAS * leadScale : 0;
+  const aimY = aim ? aim.y * CAM.AIM_BIAS * leadScale : 0;
 
   let targetX = player.x + lookX + aimX + cam.kickX;
   let targetY = player.y + lookY + aimY + cam.kickY;
 
-  // Desired zoom
-  const targetZoom = Math.min(
-    CAM.MAX_ZOOM,
-    Math.max(CAM.MIN_ZOOM, CAM.BASE_ZOOM + cam.zoomPunch)
-  );
+  // Zoom out toward EDGE_ZOOM near walls so edges stay playable
+  const base =
+    CAM.BASE_ZOOM * (1 - edge) + CAM.EDGE_ZOOM * edge + cam.zoomPunch * (1 - edge * 0.5);
+  const targetZoom = Math.min(CAM.MAX_ZOOM, Math.max(CAM.MIN_ZOOM, base));
 
-  // Clamp framing so we never show much outside the arena
-  const clampCam = (zx) => {
-    const halfW = WORLD_W / (2 * zx);
-    const halfH = WORLD_H / (2 * zx);
-    targetX = Math.max(halfW, Math.min(WORLD_W - halfW, targetX));
-    targetY = Math.max(halfH, Math.min(WORLD_H - halfH, targetY));
-  };
-  clampCam(targetZoom);
+  {
+    const { halfW, halfH } = visibleHalf(targetZoom, visFracX, visFracY);
+    // Prefer not showing endless void, then hard-guarantee ship on screen
+    const voided = clampVoid(targetX, targetY, halfW, halfH);
+    const kept = clampToKeepPlayerVisible(voided.x, voided.y, player, halfW, halfH);
+    targetX = kept.x;
+    targetY = kept.y;
+  }
 
   // Smooth follow (frame-rate independent lerp)
   const k = 1 - Math.exp(-CAM.FOLLOW * dt);
@@ -159,11 +225,14 @@ export function updateCamera(cam, player, aim, dt) {
   // Trauma decay
   cam.trauma = Math.max(0, cam.trauma - CAM.TRAUMA_DECAY * dt);
 
-  // Re-clamp after move (zoom may have changed)
-  const halfW = WORLD_W / (2 * cam.zoom);
-  const halfH = WORLD_H / (2 * cam.zoom);
-  cam.x = Math.max(halfW, Math.min(WORLD_W - halfW, cam.x));
-  cam.y = Math.max(halfH, Math.min(WORLD_H - halfH, cam.y));
+  // Final hard clamp after lerp/zoom settle — ship must stay visible
+  {
+    const { halfW, halfH } = visibleHalf(cam.zoom, visFracX, visFracY);
+    const voided = clampVoid(cam.x, cam.y, halfW, halfH);
+    const kept = clampToKeepPlayerVisible(voided.x, voided.y, player, halfW, halfH);
+    cam.x = kept.x;
+    cam.y = kept.y;
+  }
 }
 
 /**

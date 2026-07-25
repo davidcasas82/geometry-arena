@@ -242,6 +242,11 @@ export class Game {
     }
 
     const rect = this.canvas.getBoundingClientRect();
+    // Cover-fit may CSS-crop the canvas; camera needs the visible fraction
+    const wrapW = wrap ? wrap.clientWidth : rect.width;
+    const wrapH = wrap ? wrap.clientHeight : rect.height;
+    const visFracX = Math.min(1, wrapW / Math.max(1, cssW || rect.width));
+    const visFracY = Math.min(1, wrapH / Math.max(1, cssH || rect.height));
     this.display = {
       left: rect.left,
       top: rect.top,
@@ -249,6 +254,10 @@ export class Game {
       height: rect.height,
       scale,
       dpr,
+      visFracX,
+      visFracY,
+      wrapW,
+      wrapH,
     };
   }
 
@@ -1283,7 +1292,11 @@ export class Game {
     }
 
     // Camera: follow + look-ahead + aim lean + trauma
-    updateCamera(this.cam, this.player, this.input.aimVector(), dt);
+    // visFrac accounts for CSS cover-crop on phones so edge tracking stays honest
+    updateCamera(this.cam, this.player, this.input.aimVector(), dt, {
+      visFracX: this.display?.visFracX ?? 1,
+      visFracY: this.display?.visFracY ?? 1,
+    });
 
     // Thruster dust + motion afterimages
     this.particles.trail(
