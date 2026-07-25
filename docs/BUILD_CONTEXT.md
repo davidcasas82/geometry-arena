@@ -2,7 +2,7 @@
 
 **Purpose:** handoff doc so a new session (human or agent) can resume development without re-discovering architecture, product decisions, and past failure modes.
 
-**Last updated:** 2026-07-24  
+**Last updated:** 2026-07-25  
 **Project root:** `geometry-arena/` (under `My Dev Folder`)  
 **Stack:** vanilla HTML / CSS / ES modules, Canvas 2D, Web Audio SFX + HTMLAudio BGM, `localStorage` only (no backend)
 
@@ -159,6 +159,8 @@ Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu stil
 
 - **Pause** and **Game Over** only
 - Harder frame + Press Start-style title + arcade primary button
+- Pause: **Resume** + **HOW TO PLAY** (panel help, same tips as title)
+- Game over: **Play Again** + **Title** (`returnToMenu` → live-grid title)
 - Game over shows run summary + recent runs text
 
 ### 4. Header HUD
@@ -178,6 +180,8 @@ Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu stil
 - **Camera:** trauma shake with combat soft-cap + diminishing returns (dense kills don’t pin full earthquake); big events use `{ big: true }`; zoom punch on set pieces; menu camera drift  
 - **Presentation (Phase A):** DPR-scaled world buffer (cap 2×), dual-pass bloom, trauma chromatic fringe, mult color grade + stronger vignette (`GFX` in constants, `postfx.js`)  
 - **Touch / mobile:** dual virtual sticks (left move, right aim+auto-fire), BOMB/PAUSE fabs; gated by coarse pointer or narrow+touch — desktop unchanged (`input.bindTouchControls`, `body.touch-ui`)
+- **Splash dismiss:** iris `clip-path` wipe + scanline drift + `audio.splashDismiss()` sting (same user gesture unlocks AudioContext)
+- **Title ambient:** geom rain drifts on menu; PLAY fires `_playShipIntro` thruster burst
 - **BGM:** Suno “Neon Swarm” variants; alternate by level parity via `playLevelTheme(level)`
 
 ---
@@ -227,15 +231,15 @@ When changing death, invuln, scoring, or life awards, **run adversarial UAT** be
 
 These were discussed or are natural next steps — pick when product asks:
 
-- [ ] Title-menu geom rain / ambient ship intro on PLAY  
-- [ ] Game over → return to title menu option (today: Play Again starts immediately)  
-- [ ] Stronger audio sting on splash dismiss  
-- [ ] Iris / scanline wipe transition (instead of pure fade)  
+- [x] Title-menu geom rain / ambient ship intro on PLAY  
+- [x] Game over → return to title menu option (`Title` → `returnToMenu`)  
+- [x] Stronger audio sting on splash dismiss (`audio.splashDismiss`)  
+- [x] Iris / scanline wipe transition (splash `clip-path` + scan wipe)  
 - [ ] Further goldilocks passes from run history (`__arenaRuns`)  
 - [x] Gamepad support (Bluetooth/USB via Gamepad API; deadzone in constants)  
 - [x] Deployable static host (GitHub Pages → https://davidcasas82.github.io/geometry-arena/)  
-- [ ] Sync README milestone numbers with `constants.js`  
-- [ ] Pause help deep-link to same how-to content  
+- [x] Sync README milestone numbers with `constants.js`  
+- [x] Pause help deep-link to same how-to content  
 
 ---
 

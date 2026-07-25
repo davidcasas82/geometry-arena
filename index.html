@@ -133,8 +133,21 @@
           <div class="panel-glow"></div>
           <h2 id="overlay-title">Paused</h2>
           <p id="overlay-message">Take a breath. The shapes can wait.</p>
-          <button id="interrupt-btn" class="btn arcade compact" type="button">Resume</button>
-          <button id="resume-btn" class="btn secondary hidden" type="button">Resume</button>
+          <div class="interrupt-actions">
+            <button id="interrupt-btn" class="btn arcade compact" type="button">Resume</button>
+            <button id="title-btn" class="btn secondary compact hidden" type="button">Title</button>
+            <button id="resume-btn" class="btn secondary compact hidden" type="button">Resume</button>
+          </div>
+          <button id="panel-help-btn" class="title-help panel-help hidden" type="button">HOW TO PLAY</button>
+          <ul id="panel-howto" class="how-to title-howto panel-howto hidden">
+            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · click-hold fire · drag to aim</li>
+            <li>Gamepad: left stick move · right stick aim · RT fire · LT bomb</li>
+            <li class="how-touch">Phone: left thumb move · right thumb aim + fire · BOMB button</li>
+            <li>Kill → green <strong>geoms</strong> → scoop for ×mult (scores explode)</li>
+            <li>Pink dashes · purple splitters · voids pull you in</li>
+            <li><kbd>Space</kbd> / A bomb clears (no points) · death soft-resets mult</li>
+            <li>Extra life · bomb milestones · <kbd>P</kbd> / Start pause</li>
+          </ul>
         </div>
       </div>
     </main>

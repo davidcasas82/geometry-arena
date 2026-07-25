@@ -31,6 +31,7 @@ Or open `index.html` with any static file server (ES modules need a server, not 
 | Pause | `P` / `Esc` | **Start** / Options |
 | Mute | `M` | **Back** / Select / Share |
 | Restart | Play Again / `R` after game over | **A** or **Start** |
+| Title menu | **Title** on game over | — |
 | Title PLAY | `Enter` / `Space` | **A** or **Start** |
 
 ### Touch (phone / tablet)
@@ -52,12 +53,12 @@ On play, the game captures the pointer so trackpad aim doesn’t stop at the scr
 
 See honest gap scores vs the real game: [`docs/VS_GEOMETRY_WARS.md`](docs/VS_GEOMETRY_WARS.md).
 
-- **Geom mult economy** — +1 ×mult per geom, ceiling 999, idle decay, death resets  
+- **Geom mult economy** — +1 ×mult per geom, ceiling 999, idle decay, death soft-keeps mult  
 - **Reactive neon grid**, additive particles, thruster afterimages  
-- **Fire densifies with mult** (rate + extra streams)  
-- **Bombs** — shockwave clear, no points; start 3; +1 / 100k  
-- **Extra lives** / 75k  
-- **Wave spawn director** (bursts + lulls)
+- **Fire densifies with mult** (rate + dual/triple streams at high ×)  
+- **Bombs** — shockwave clear, no points; start 3 / max 5; +1 every **38k** base progress  
+- **Extra lives** — start 3 / max 5; first +life every **32k** base progress (escalates)  
+- **Wave spawn director** (bursts + lulls + formations)
 
 ## Enemies
 
@@ -72,7 +73,7 @@ See honest gap scores vs the real game: [`docs/VS_GEOMETRY_WARS.md`](docs/VS_GEO
 | Orange tank | Slow, 3 HP |
 | Void (black hole) | Pulls you in, spawns atoms |
 
-Scoop **geoms** to raise multiplier. Death resets mult.
+Scoop **geoms** to raise multiplier. Death soft-resets mult (keeps a recovery seed).
 
 ## Soundtrack
 

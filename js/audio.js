@@ -101,6 +101,15 @@ export class AudioBus {
     });
   }
 
+  /** Full-screen splash dismiss — short neon sting + whoosh into title. */
+  splashDismiss() {
+    this.tone(220, 0.12, "sawtooth", 0.04, 80);
+    this.tone(660, 0.1, "square", 0.035, 1320);
+    setTimeout(() => this.tone(880, 0.14, "triangle", 0.04, 1760), 40);
+    setTimeout(() => this.tone(1320, 0.18, "sine", 0.03, 2400), 90);
+    setTimeout(() => this.tone(180, 0.28, "triangle", 0.025, 40), 50);
+  }
+
   levelUp() {
     [523, 659, 784, 1046].forEach((f, i) => {
       setTimeout(() => this.tone(f, 0.1, "square", 0.04), i * 55);

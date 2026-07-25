@@ -198,20 +198,24 @@ export class Game {
   fitCanvas() {
     if (!this.worldCanvas) this._initPresentationBuffers();
     const wrap = this.canvas.parentElement;
-    // Use full stage area; small padding so border glow still shows
-    const pad = 4;
+    const touchUi =
+      typeof document !== "undefined" &&
+      document.body?.classList?.contains("touch-ui");
+
+    // Desktop: slight pad so stage border glow still shows.
+    // Touch: edge-to-edge cover-fit (fill width+height; crop letterbox bars).
+    const pad = touchUi ? 0 : 4;
     const maxW = Math.max(320, (wrap ? wrap.clientWidth : window.innerWidth) - pad);
     const maxH = Math.max(180, (wrap ? wrap.clientHeight : window.innerHeight) - pad);
-    const scale = Math.min(maxW / WORLD_W, maxH / WORLD_H);
+    const scale = touchUi
+      ? Math.max(maxW / WORLD_W, maxH / WORLD_H)
+      : Math.min(maxW / WORLD_W, maxH / WORLD_H);
     const cssW = Math.floor(WORLD_W * scale);
     const cssH = Math.floor(WORLD_H * scale);
     this.canvas.style.width = `${cssW}px`;
     this.canvas.style.height = `${cssH}px`;
 
     // Retina / HiDPI backing store (capped; lower on touch UI for heat/battery)
-    const touchUi =
-      typeof document !== "undefined" &&
-      document.body?.classList?.contains("touch-ui");
     const dprCap = touchUi ? Math.min(GFX.MAX_DPR, TOUCH_MAX_DPR) : GFX.MAX_DPR;
     const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
     this.dpr = dpr;
@@ -301,6 +305,21 @@ export class Game {
     this.ui.updateLevel?.(1);
     this.fitCanvas();
     this.input.requestPointerLock();
+    // Brief thruster intro so PLAY feels like the ship wakes up
+    this._playShipIntro();
+  }
+
+  /** One-shot thruster + grid punch when a run begins from the title. */
+  _playShipIntro() {
+    const px = this.player.x;
+    const py = this.player.y;
+    this.particles.burst(px, py, COLORS.player, 28, 220);
+    this.particles.burst(px, py, COLORS.playerCore, 12, 140);
+    this.particles.ring(px, py, COLORS.playerGlow, 36, 280);
+    this._gridPulse(px, py, 1.4);
+    addTrauma(this.cam, 0.12, { big: true });
+    punchZoom(this.cam, 0.05);
+    this.particles.floater(px, py - 40, "GO", COLORS.player, 1.2);
   }
 
   pause() {
@@ -308,9 +327,14 @@ export class Game {
     this.state = "paused";
     this.input.exitPointerLock();
     this.audio.pauseBgm();
-    // Single primary button only (showResume would duplicate "Resume")
-    this.ui.showOverlay("Paused", "Take a breath. The shapes can wait.", false, "Resume", () =>
-      this.resume()
+    // Primary Resume + pause help deep-link (same how-to content as title)
+    this.ui.showOverlay(
+      "Paused",
+      "Take a breath. The shapes can wait.",
+      false,
+      "Resume",
+      () => this.resume(),
+      { showHelp: true }
     );
   }
 
@@ -323,6 +347,65 @@ export class Game {
     this.lastTime = performance.now();
     this.audio.resumeBgm();
     this.input.requestPointerLock();
+  }
+
+  /** Soft exit to live-grid title (from game over Title button). */
+  returnToMenu() {
+    this.state = "menu";
+    this.input.exitPointerLock();
+    this.input.clearFireButton();
+    this.input.clearEdgeActions();
+    this.audio.stopBgm();
+    this.bullets = [];
+    this.enemies = [];
+    this.geoms = [];
+    this.gridImpulses = [];
+    this.spawnQueue = [];
+    this.waveLeft = 0;
+    this.bombFlash = 0;
+    this.afterimages = [];
+    this.geomVacuum = 0;
+    this.particles.clear();
+    this.player = createPlayer();
+    resetCamera(this.cam);
+    this.ui.updateScore(0);
+    this.ui.updateMult(1);
+    this.ui.updateLives(START_LIVES);
+    this.ui.updateBombs?.(START_BOMBS);
+    this.ui.updateLevel?.(1);
+    this.ui.showTitleMenu?.();
+  }
+
+  /**
+   * Title-screen geom rain — drift + mild ship magnet, no mult awards.
+   * Keeps pickups readable without competing with the PLAY CTA.
+   */
+  _updateMenuGeoms(dt) {
+    for (let i = this.geoms.length - 1; i >= 0; i--) {
+      const g = this.geoms[i];
+      g.life -= dt;
+      // Gentle pull toward the idle ship so rain clusters a little
+      const dx = this.player.x - g.x;
+      const dy = this.player.y - g.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < 220 * 220 && d2 > 1) {
+        const d = Math.sqrt(d2);
+        g.vx += (dx / d) * 28 * dt;
+        g.vy += (dy / d) * 28 * dt;
+      }
+      g.vx *= 0.992;
+      g.vy = Math.min(140, g.vy + 18 * dt);
+      g.x += g.vx * dt;
+      g.y += g.vy * dt;
+      if (
+        g.life <= 0 ||
+        g.y > WORLD_H + 40 ||
+        g.x < -40 ||
+        g.x > WORLD_W + 40
+      ) {
+        this.geoms.splice(i, 1);
+      }
+    }
   }
 
   _advanceLevel() {
@@ -384,7 +467,12 @@ export class Game {
       `This run: ${timeStr} · ${this.score.toLocaleString()} · peak ×${this.peakMult} · ${this.deathCount} death(s)\nBest ${this.best.toLocaleString()}\n\nLast runs:\n${summary}`,
       false,
       "Play Again",
-      () => this.start()
+      () => this.start(),
+      {
+        showTitle: true,
+        onTitle: () => this.returnToMenu(),
+        showHelp: false,
+      }
     );
   }
 
@@ -1391,6 +1479,8 @@ export class Game {
         this.player.angle += dt * 0.85;
         this.particles.update(dt * 0.5);
         updateMenuCamera(this.cam, dt);
+        // Soft geom rain — pickups drift through the title arena
+        this._updateMenuGeoms(dt);
         // Ambient grid pulses — sell the "living arena" on the title screen
         if (Math.random() < 0.035) {
           this._gridPulse(
@@ -1405,6 +1495,14 @@ export class Game {
             6,
             80
           );
+        }
+        // Occasional geom drop from the top
+        if (Math.random() < 0.06 && this.geoms.length < 28) {
+          const g = createGeom(40 + Math.random() * (WORLD_W - 80), -12 - Math.random() * 40);
+          g.vx = (Math.random() - 0.5) * 40;
+          g.vy = 40 + Math.random() * 70;
+          g.life = 8 + Math.random() * 6;
+          this.geoms.push(g);
         }
         for (let i = this.gridImpulses.length - 1; i >= 0; i--) {
           this.gridImpulses[i].life -= dt;

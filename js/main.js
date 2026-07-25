@@ -7,10 +7,12 @@ const overlayTitle = document.getElementById("overlay-title");
 const overlayMessage = document.getElementById("overlay-message");
 const startBtn = document.getElementById("start-btn");
 const interruptBtn = document.getElementById("interrupt-btn");
+const titleBtn = document.getElementById("title-btn");
 const resumeBtn = document.getElementById("resume-btn");
 const pauseBtn = document.getElementById("pause-btn");
 const muteBtn = document.getElementById("mute-btn");
 const helpBtn = document.getElementById("help-btn");
+const panelHelpBtn = document.getElementById("panel-help-btn");
 const scoreEl = document.getElementById("score");
 const levelEl = document.getElementById("level");
 const multEl = document.getElementById("mult");
@@ -19,6 +21,7 @@ const bombsEl = document.getElementById("bombs");
 const bestEl = document.getElementById("best");
 const titleBestEl = document.getElementById("title-best");
 const howTo = document.getElementById("how-to");
+const panelHowto = document.getElementById("panel-howto");
 const titleMenu = document.getElementById("title-menu");
 const interruptPanel = document.getElementById("interrupt-panel");
 const splash = document.getElementById("splash");
@@ -26,8 +29,10 @@ const touchControls = document.getElementById("touch-controls");
 const portraitHint = document.getElementById("portrait-hint");
 
 let pendingAction = null;
+let titleAction = null;
 let splashDone = false;
 let helpOpen = false;
+let panelHelpOpen = false;
 
 /** Phones / tablets: touch points + coarse pointer or narrow viewport. */
 function preferTouchUI() {
@@ -79,12 +84,23 @@ function setOverlayMode(mode) {
   interruptPanel?.classList.toggle("hidden", mode !== "panel");
 }
 
+function resetPanelHelp() {
+  panelHelpOpen = false;
+  panelHowto?.classList.add("hidden");
+  if (panelHelpBtn) panelHelpBtn.textContent = "HOW TO PLAY";
+}
+
 /** Live-grid title menu (post-splash / return to menu). */
 function showTitleMenu() {
   pendingAction = null;
+  titleAction = null;
   helpOpen = false;
   howTo?.classList.add("hidden");
   if (helpBtn) helpBtn.textContent = "HOW TO PLAY";
+  resetPanelHelp();
+  titleBtn?.classList.add("hidden");
+  resumeBtn?.classList.add("hidden");
+  panelHelpBtn?.classList.add("hidden");
 
   setOverlayMode("title");
   if (titleMenu) {
@@ -121,11 +137,25 @@ const ui = {
     overlay.classList.add("hidden");
     howTo?.classList.add("hidden");
     helpOpen = false;
+    resetPanelHelp();
+    titleBtn?.classList.add("hidden");
+    titleAction = null;
     syncTouchChrome();
   },
-  /** Interrupt UIs only (pause / game over). Title menu uses showTitleMenu. */
-  showOverlay(title, message, showResume = false, primaryLabel = "Play", onPrimary = null) {
+  /**
+   * Interrupt UIs only (pause / game over). Title menu uses showTitleMenu.
+   * @param {{ showTitle?: boolean, onTitle?: function|null, showHelp?: boolean }} [opts]
+   */
+  showOverlay(
+    title,
+    message,
+    showResume = false,
+    primaryLabel = "Play",
+    onPrimary = null,
+    opts = {}
+  ) {
     pendingAction = onPrimary;
+    titleAction = typeof opts.onTitle === "function" ? opts.onTitle : null;
     if (overlayTitle) overlayTitle.textContent = title;
     if (overlayMessage) overlayMessage.textContent = message;
     if (interruptBtn) interruptBtn.textContent = primaryLabel;
@@ -136,6 +166,19 @@ const ui = {
       resumeBtn?.classList.remove("hidden");
     } else {
       resumeBtn?.classList.add("hidden");
+    }
+
+    if (opts.showTitle && titleAction) {
+      titleBtn?.classList.remove("hidden");
+    } else {
+      titleBtn?.classList.add("hidden");
+    }
+
+    resetPanelHelp();
+    if (opts.showHelp) {
+      panelHelpBtn?.classList.remove("hidden");
+    } else {
+      panelHelpBtn?.classList.add("hidden");
     }
 
     howTo?.classList.add("hidden");
@@ -149,18 +192,26 @@ const ui = {
   },
 };
 
-/** Full-screen 16-bit title → live-grid menu. */
+/** Full-screen 16-bit title → live-grid menu (iris wipe + sting). */
 function dismissSplash() {
   if (splashDone || !splash) return;
   splashDone = true;
+  // Unlock audio on the same user gesture, then sting into the wipe
+  try {
+    game?.audio?.ensure?.();
+    game?.audio?.splashDismiss?.();
+  } catch {
+    /* ignore */
+  }
   splash.classList.add("leaving");
-  const finish = () => {
+  const finish = (e) => {
+    if (e && e.target !== splash) return;
     splash.classList.add("hidden");
     splash.removeEventListener("transitionend", finish);
   };
   splash.addEventListener("transitionend", finish);
-  setTimeout(finish, 700);
-  // Reveal title menu while splash fades — continuous scene, not a hard cut
+  setTimeout(() => finish(), 900);
+  // Reveal title menu while splash wipes — continuous scene, not a hard cut
   showTitleMenu();
 }
 
@@ -182,7 +233,9 @@ if (splash) {
   showTitleMenu();
 }
 
-const game = new Game(canvas, ui);
+/** Assigned after UI helpers so splash dismiss can safely optional-chain audio. */
+let game = null;
+game = new Game(canvas, ui);
 window.__geometryArena = game;
 window.__arenaRuns = () => dumpRunsToConsole();
 window.__arenaRecent = () => getRecentRuns(10);
@@ -253,6 +306,15 @@ function onPrimaryAction() {
 startBtn?.addEventListener("click", onPrimaryAction);
 interruptBtn?.addEventListener("click", onPrimaryAction);
 
+titleBtn?.addEventListener("click", () => {
+  if (typeof titleAction === "function") {
+    const fn = titleAction;
+    titleAction = null;
+    fn();
+    syncTouchChrome();
+  }
+});
+
 resumeBtn?.addEventListener("click", () => {
   game.resume();
 });
@@ -271,6 +333,13 @@ helpBtn?.addEventListener("click", (e) => {
   helpOpen = !helpOpen;
   howTo?.classList.toggle("hidden", !helpOpen);
   helpBtn.textContent = helpOpen ? "HIDE HELP" : "HOW TO PLAY";
+});
+
+panelHelpBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  panelHelpOpen = !panelHelpOpen;
+  panelHowto?.classList.toggle("hidden", !panelHelpOpen);
+  panelHelpBtn.textContent = panelHelpOpen ? "HIDE HELP" : "HOW TO PLAY";
 });
 
 // Arcade shortcuts on title menu: Enter / Space → PLAY
