@@ -422,6 +422,100 @@ export function drawArena(ctx, arena, opts = {}) {
   ctx.restore();
 }
 
+/**
+ * Sektori-style red danger telegraph: regions that will become solid when
+ * `nextArena` commits. Flash rate accelerates as progress → 1.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {ArenaInstance} current
+ * @param {ArenaInstance} next
+ * @param {number} progress 0..1 through warn window
+ * @param {number} [t=0] world time for flicker phase
+ */
+export function drawMorphDanger(ctx, current, next, progress = 0, t = 0) {
+  if (!ctx || !current || !next) return;
+  const p = Math.max(0, Math.min(1, progress));
+  if (p <= 0) return;
+  // Accelerate flash: 4Hz → 14Hz
+  const hz = 4 + p * 10;
+  const flash = 0.5 + 0.5 * Math.sin(t * hz * Math.PI * 2);
+  const reduced = false; // caller can dim via alpha; keep full for telegraph honesty
+  const fillA = (0.1 + p * 0.22) * (0.55 + 0.45 * flash);
+  const edgeA = (0.45 + p * 0.5) * (0.65 + 0.35 * flash);
+
+  const W = current.worldW;
+  const H = current.worldH;
+  const step = 28;
+
+  ctx.save();
+  // Sample grid cells that are open now but solid after morph
+  for (let y = step * 0.5; y < H; y += step) {
+    for (let x = step * 0.5; x < W; x += step) {
+      const nowSolid = pointInSolid(current, x, y);
+      const nextSolid = pointInSolid(next, x, y);
+      if (!nowSolid && nextSolid) {
+        ctx.fillStyle = colorWithAlpha(COLORS.danger, fillA);
+        ctx.fillRect(x - step * 0.5, y - step * 0.5, step + 0.5, step + 0.5);
+      }
+    }
+  }
+
+  // Hard edge strokes of next playable AABB when applicable
+  ctx.globalCompositeOperation = "lighter";
+  const nb = next.playableBounds;
+  if (
+    next.topology === "rect_tight" ||
+    next.topology === "rect_wide" ||
+    next.topology === "corridor" ||
+    next.topology === "pill_2d"
+  ) {
+    ctx.strokeStyle = colorWithAlpha(COLORS.danger, edgeA);
+    ctx.lineWidth = 3 + flash * 2;
+    ctx.strokeRect(nb.x, nb.y, nb.w, nb.h);
+    ctx.strokeStyle = `rgba(255, 200, 210, ${edgeA * 0.55})`;
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(nb.x, nb.y, nb.w, nb.h);
+    // Outer death slabs get a second rim
+    bloom(ctx, nb.x + nb.w * 0.5, nb.y, 80, COLORS.danger, 0.12 * flash * p);
+    bloom(ctx, nb.x + nb.w * 0.5, nb.y + nb.h, 80, COLORS.danger, 0.12 * flash * p);
+  } else if (next.topology === "cross") {
+    const arm = Math.max(60, Number(next.params.armHalfWidth || next.params._armHalfWidth) || 180);
+    ctx.strokeStyle = colorWithAlpha(COLORS.danger, edgeA);
+    ctx.lineWidth = 3 + flash * 2;
+    // Horizontal arm bounds
+    ctx.beginPath();
+    ctx.moveTo(0, next.cy - arm);
+    ctx.lineTo(W, next.cy - arm);
+    ctx.moveTo(0, next.cy + arm);
+    ctx.lineTo(W, next.cy + arm);
+    // Vertical arm bounds
+    ctx.moveTo(next.cx - arm, 0);
+    ctx.lineTo(next.cx - arm, H);
+    ctx.moveTo(next.cx + arm, 0);
+    ctx.lineTo(next.cx + arm, H);
+    ctx.stroke();
+  } else if (next.topology === "rect") {
+    // Expanding back to full rect — flash world rim as safe return
+    ctx.strokeStyle = colorWithAlpha(COLORS.danger, edgeA * 0.7);
+    ctx.lineWidth = 4;
+    ctx.strokeRect(4, 4, W - 8, H - 8);
+  }
+
+  // Screen-edge danger vignette during late warn
+  if (p > 0.35) {
+    const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, W * 0.72);
+    v.addColorStop(0, "rgba(0,0,0,0)");
+    v.addColorStop(0.7, "rgba(0,0,0,0)");
+    v.addColorStop(1, colorWithAlpha(COLORS.danger, (p - 0.35) * 0.35 * flash));
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  ctx.restore();
+  void reduced;
+}
+
 // ── Internal geometry ────────────────────────────────────────
 
 function pointInSolid(arena, x, y) {

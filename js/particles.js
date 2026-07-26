@@ -1,9 +1,10 @@
-import { FLOATER_MAX, PARTICLE_MAX } from "./constants.js";
+import { FLOATER_MAX, GFX, PARTICLE_MAX } from "./constants.js";
 import { colorWithAlpha } from "./fx.js";
 
 /**
  * Additive neon particles — sparks, streaks, rings, thruster dust,
  * vacuum inhale streams + electric bolts.
+ * Sektori rule: spectacle is front-loaded; debris dies fast so the board stays readable.
  */
 export class ParticleSystem {
   constructor() {
@@ -17,36 +18,43 @@ export class ParticleSystem {
   burst(x, y, color, count = 28, speed = 320) {
     const room = PARTICLE_MAX - this.particles.length;
     const n = Math.min(count, Math.max(0, room));
+    const streakLife = GFX.KILL_STREAK_LIFE || 0.26;
+    const softLife = GFX.KILL_SOFT_LIFE || 0.32;
     for (let i = 0; i < n; i++) {
       const ang = Math.random() * Math.PI * 2;
-      const sp = speed * (0.35 + Math.random() * 1.25);
-      const isStreak = Math.random() < 0.5;
+      const sp = speed * (0.45 + Math.random() * 1.2);
+      // Bias streaks — short hot filaments over lingering soft dots
+      const isStreak = Math.random() < 0.72;
+      const life = isStreak
+        ? streakLife * (0.55 + Math.random() * 0.55)
+        : softLife * (0.5 + Math.random() * 0.55);
       this.particles.push({
         x,
         y,
         vx: Math.cos(ang) * sp,
         vy: Math.sin(ang) * sp,
-        life: isStreak ? 0.28 + Math.random() * 0.28 : 0.5 + Math.random() * 0.55,
-        maxLife: isStreak ? 0.5 : 0.9,
-        size: isStreak ? 1.4 + Math.random() * 1.6 : 2.2 + Math.random() * 4.2,
+        life,
+        maxLife: life,
+        size: isStreak ? 1.3 + Math.random() * 1.5 : 1.8 + Math.random() * 2.6,
         color,
         streak: isStreak,
-        hot: Math.random() < 0.4,
+        hot: isStreak || Math.random() < 0.55,
       });
     }
-    // White-hot core sparks
-    const coreN = Math.min(14, Math.max(0, room - n));
+    // White-hot core sparks (first-frame punch)
+    const coreN = Math.min(18, Math.max(0, room - n));
     for (let i = 0; i < coreN; i++) {
       const ang = Math.random() * Math.PI * 2;
-      const sp = speed * (0.7 + Math.random() * 1.0);
+      const sp = speed * (0.85 + Math.random() * 1.1);
+      const life = 0.1 + Math.random() * 0.14;
       this.particles.push({
         x,
         y,
         vx: Math.cos(ang) * sp,
         vy: Math.sin(ang) * sp,
-        life: 0.18 + Math.random() * 0.18,
-        maxLife: 0.35,
-        size: 1.6 + Math.random() * 1.8,
+        life,
+        maxLife: life,
+        size: 1.4 + Math.random() * 1.6,
         color: "#ffffff",
         streak: true,
         hot: true,
@@ -59,40 +67,41 @@ export class ParticleSystem {
     const n = Math.min(count, Math.max(0, room));
     for (let i = 0; i < n; i++) {
       const ang = (i / n) * Math.PI * 2 + Math.random() * 0.05;
-      const sp = speed * (0.9 + Math.random() * 0.35);
+      const sp = speed * (0.95 + Math.random() * 0.4);
+      const life = 0.28 + Math.random() * 0.12;
       this.particles.push({
         x,
         y,
         vx: Math.cos(ang) * sp,
         vy: Math.sin(ang) * sp,
-        life: 0.6,
-        maxLife: 0.6,
-        size: 2.8,
+        life,
+        maxLife: life,
+        size: 2.4,
         color,
         streak: true,
-        hot: i % 3 === 0,
+        hot: i % 2 === 0,
       });
     }
-    // Dual expanding shockwave rings
+    // Dual expanding shockwave rings — short-lived white core + color
     this.rings.push({
       x,
       y,
-      r: 10,
-      vr: speed * 0.7,
-      life: 0.55,
-      maxLife: 0.55,
+      r: 8,
+      vr: speed * 0.85,
+      life: 0.32,
+      maxLife: 0.32,
       color,
-      width: 4.5,
+      width: 4.2,
     });
     this.rings.push({
       x,
       y,
-      r: 4,
-      vr: speed * 0.95,
-      life: 0.4,
-      maxLife: 0.4,
+      r: 3,
+      vr: speed * 1.05,
+      life: 0.24,
+      maxLife: 0.24,
       color: "#ffffff",
-      width: 2.5,
+      width: 2.4,
     });
   }
 

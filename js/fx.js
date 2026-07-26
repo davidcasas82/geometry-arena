@@ -23,6 +23,12 @@ export function neonStroke(ctx, color, coreWidth = 2, glowWidth = 8, glowAlpha =
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
+  // Dark silhouette strike first (contrast against busy floor)
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.65)";
+  ctx.lineWidth = glowWidth * 1.35 + coreWidth;
+  ctx.stroke();
+
   // Wide soft outer
   ctx.globalCompositeOperation = "lighter";
   ctx.strokeStyle = colorWithAlpha(color, glowAlpha * 0.45);
@@ -40,8 +46,8 @@ export function neonStroke(ctx, color, coreWidth = 2, glowWidth = 8, glowAlpha =
   ctx.stroke();
 
   // Hot white center line
-  ctx.strokeStyle = "rgba(255,255,255,0.55)";
-  ctx.lineWidth = Math.max(0.8, coreWidth * 0.35);
+  ctx.strokeStyle = "rgba(255,255,255,0.62)";
+  ctx.lineWidth = Math.max(0.8, coreWidth * 0.38);
   ctx.stroke();
 
   ctx.restore();
@@ -53,13 +59,28 @@ export function neonFillStroke(ctx, fillColor, strokeColor, coreWidth = 2) {
   ctx.lineCap = "round";
   ctx.fillStyle = fillColor;
   ctx.fill();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = colorWithAlpha(strokeColor, 0.4);
-  ctx.lineWidth = coreWidth * 3.5;
+
+  // Dark outer strike — punches silhouette off multi-hue floor / bloom
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.72)";
+  ctx.lineWidth = coreWidth * 4.2;
   ctx.stroke();
+
+  // Soft colored glow outside the dark strike
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = colorWithAlpha(strokeColor, 0.42);
+  ctx.lineWidth = coreWidth * 2.6;
+  ctx.stroke();
+
+  // Bright body stroke
   ctx.globalCompositeOperation = "source-over";
   ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = coreWidth;
+  ctx.lineWidth = coreWidth * 1.15;
+  ctx.stroke();
+
+  // Hot white strike line for edge read
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+  ctx.lineWidth = Math.max(0.9, coreWidth * 0.4);
   ctx.stroke();
   ctx.restore();
 }

@@ -34,6 +34,7 @@ import {
   MULT_DECAY_INTERVAL,
   MULT_FOR_TRIPLE,
   MULT_IDLE_BEFORE_DECAY,
+  MORPH,
   MULT_MAX,
   PHRASE,
   SAFE_OPENING_SEC,
@@ -54,6 +55,8 @@ import {
   createArena,
   createDefaultArena,
   drawArena,
+  drawMorphDanger,
+  hitsSolid,
   randomPlayablePoint,
 } from "./arenas.js";
 import {
@@ -103,12 +106,14 @@ import {
   drawGeoms,
   drawGrid,
   drawPlayer,
+  enemyIsOutline,
 } from "./render.js";
 import {
   compositeBloom,
   compositeChromatic,
   drawColorGrade,
   drawPostVignette,
+  technoPulse,
 } from "./postfx.js";
 
 export class Game {
@@ -314,6 +319,7 @@ start() {
     this._clearPathRuntime();
     this.shell = "classic";
     this.setArena({ topology: "rect" });
+    this._resetMorphRuntime();
     this.score = 0;
     this.lives = START_LIVES;
     this.bombs = START_BOMBS;
@@ -408,6 +414,18 @@ this.modeFlags = new Set();
     this.pathMaxEnemies = null;
     this.pathScoreMult = 1;
     this.pathWaveId = null;
+    this._resetMorphRuntime();
+  }
+
+  /** Classic morph state (Sektori arena pressure). Path leaves this idle. */
+  _resetMorphRuntime() {
+    this.morphIndex = 0;
+    this.morphTimer = MORPH.FIRST_AT;
+    this.morphWarn = false;
+    this.morphWarnT = 0;
+    this.morphNextRef = null;
+    this.morphNextArena = null;
+    this.morphFlash = 0;
   }
 
 /**
@@ -420,6 +438,110 @@ this.modeFlags = new Set();
     this.world = { w: arena.worldW, h: arena.worldH };
     setEntityArena(arena);
     return arena;
+  }
+
+  /**
+   * Classic-only: warn → commit topology morph with red danger zones.
+   * Caught outside next playable = death (after warn).
+   */
+  _tickMorph(dt) {
+    if (!MORPH.ENABLED_CLASSIC) return;
+    if (this.pathLevel) return; // Path stays authored/static
+    if (this.state !== "playing") return;
+
+    if (this.morphFlash > 0) this.morphFlash = Math.max(0, this.morphFlash - dt);
+
+    if (this.morphWarn) {
+      this.morphWarnT += dt;
+      const warnSec = Math.max(0.6, MORPH.WARN_SEC || 2);
+      if (this.morphWarnT >= warnSec) {
+        this._commitMorph();
+      }
+      return;
+    }
+
+    this.morphTimer -= dt;
+    if (this.morphTimer > 0) return;
+
+    // Begin warn for next shape
+    const shapes = MORPH.SHAPES || [{ topology: "rect" }];
+    this.morphIndex = (this.morphIndex + 1) % shapes.length;
+    const ref = shapes[this.morphIndex] || { topology: "rect" };
+    this.morphNextRef = ref;
+    this.morphNextArena = createArena(ref);
+    this.morphWarn = true;
+    this.morphWarnT = 0;
+    this.particles.floater(
+      this.player.x,
+      this.player.y - 56,
+      "SHIFT",
+      COLORS.danger,
+      1.25
+    );
+    this.audio.enemyHit?.();
+  }
+
+  _commitMorph() {
+    const nextRef = this.morphNextRef || { topology: "rect" };
+    this.setArena(nextRef);
+    this.morphWarn = false;
+    this.morphWarnT = 0;
+    this.morphNextRef = null;
+    this.morphNextArena = null;
+    this.morphTimer = Math.max(6, MORPH.INTERVAL || 12);
+    this.morphFlash = 0.45;
+    this.bombFlash = Math.max(this.bombFlash, 0.18);
+    this._gridPulse(this.player.x, this.player.y, 2.2);
+    addTrauma(this.cam, 0.28, { big: true });
+    punchZoom(this.cam, 0.05);
+    this.particles.floater(
+      this.player.x,
+      this.player.y - 48,
+      "LOCKED",
+      COLORS.player,
+      1.1
+    );
+
+    // Instant death if still outside after lock (Sektori trap rule)
+    // Mercy: if invuln/control lock, shove into playable instead
+    if (this.arena && hitsSolid(this.arena, this.player.x, this.player.y, this.player.r)) {
+      if (this.player.invuln > 0 || this.player.controlLock > 0) {
+        try {
+          const pt = randomPlayablePoint(this.arena, Math.random, this.player.r || 13);
+          if (pt) {
+            this.player.x = pt.x;
+            this.player.y = pt.y;
+          }
+        } catch {
+          /* keep */
+        }
+      } else {
+        this.particles.floater(
+          this.player.x,
+          this.player.y - 70,
+          "CRUSHED",
+          COLORS.danger,
+          1.35
+        );
+        this._playerHit();
+      }
+    }
+
+    // Shove enemies that got walled into playable so they don't stuck-clip
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      if (hitsSolid(this.arena, e.x, e.y, e.r * 0.5)) {
+        try {
+          const pt = randomPlayablePoint(this.arena, Math.random, e.r || 10);
+          if (pt) {
+            e.x = pt.x;
+            e.y = pt.y;
+          }
+        } catch {
+          /* keep */
+        }
+      }
+    }
   }
 
   /** @returns {import('./modes.js').ModeContext} */
@@ -458,12 +580,15 @@ this.modeFlags = new Set();
       return false;
     }
 
-// Shared run reset via classic start, then overlay Path config
+    // Shared run reset via classic start, then overlay Path config
     this.start();
     this.shell = "path";
     this.pathLevel = level;
     this.pathEnding = false;
     this.modeFlags = new Set();
+    // Path keeps authored topology — no Classic morph pressure
+    this._resetMorphRuntime();
+    this.morphTimer = 1e9;
 
     const rules = level.rules || {};
     this.lives = rules.lives != null ? Number(rules.lives) : START_LIVES;
@@ -1297,10 +1422,10 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
       enemy.type === "snake" ||
       enemy.type === "void" ||
       enemy.type === "splitter";
-    // Layered blast: color debris + white core + shock ring
-    this.particles.burst(enemy.x, enemy.y, enemy.color, 38 + enemy.r * 1.4, 360 + enemy.r * 10);
-    this.particles.burst(enemy.x, enemy.y, "#ffffff", 16 + (big ? 10 : 0), 280);
-    this.particles.ring(enemy.x, enemy.y, enemy.color, big ? 36 : 18, big ? 380 : 240);
+    // Sektori kill juice: denser front-loaded pop (short TTL handled in particles)
+    this.particles.burst(enemy.x, enemy.y, enemy.color, 52 + enemy.r * 1.8, 400 + enemy.r * 12);
+    this.particles.burst(enemy.x, enemy.y, "#ffffff", 22 + (big ? 14 : 0), 320);
+    this.particles.ring(enemy.x, enemy.y, enemy.color, big ? 44 : 24, big ? 420 : 280);
     if (big) {
       this.particles.shockwave(enemy.x, enemy.y, enemy.color, 220 + enemy.r * 8);
       this.bombFlash = Math.max(this.bombFlash, 0.22);
@@ -1655,6 +1780,8 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
   }
 
   _enemyHitPlayer(e) {
+    // Outline telegraph: red wireframe only — not yet a solid threat
+    if (enemyIsOutline(e)) return false;
     if (e.type === "snake") {
       for (const s of snakeSegments(e)) {
         if (circlesOverlap(this.player.x, this.player.y, this.player.r, s.x, s.y, s.r)) {
@@ -1667,6 +1794,8 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
   }
 
   _bulletHitsEnemy(b, e) {
+    // Can't kill / graze during outline phase (fairness with spawn telegraph)
+    if (enemyIsOutline(e)) return false;
     if (e.type === "snake") {
       for (const s of snakeSegments(e)) {
         if (circlesOverlap(b.x, b.y, b.r, s.x, s.y, s.r)) return true;
@@ -1700,6 +1829,7 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     this.elapsed += dt;
     this.time += dt;
     this.levelTimer += dt;
+    this._tickMorph(dt);
     if (this.mult > this.peakMult) this.peakMult = this.mult;
     // Classic Evolved stage/BGM cadence only — Path uses fixed short levels
     if (!this.pathLevel && this.levelTimer >= LEVEL_DURATION_SEC) {
@@ -1906,13 +2036,38 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     wctx.fillStyle = "#000005";
     wctx.fillRect(0, 0, bw, bh);
 
-wctx.save();
+    wctx.save();
     applyCameraTransform(wctx, this.cam, dpr);
     // Floor environment first…
     const ww = this.world?.w || WORLD_W;
     const wh = this.world?.h || WORLD_H;
-    drawGrid(wctx, 0, 0, this.gridImpulses, this.time, ww, wh);
+    const pulse = technoPulse(this.time, GFX.TECHNO_BPM);
+    drawGrid(wctx, 0, 0, this.gridImpulses, this.time, ww, wh, pulse);
     if (this.arena) drawArena(wctx, this.arena, { time: this.time, cam: this.cam });
+    // Morph danger telegraph (red zones about to become solid)
+    if (
+      this.morphWarn &&
+      this.morphNextArena &&
+      this.arena &&
+      !this.pathLevel
+    ) {
+      const warnSec = Math.max(0.6, MORPH.WARN_SEC || 2);
+      const prog = Math.min(1, this.morphWarnT / warnSec);
+      drawMorphDanger(wctx, this.arena, this.morphNextArena, prog, this.time);
+    }
+    // Brief white/red rim flash on morph commit
+    if (this.morphFlash > 0) {
+      const a = Math.min(1, this.morphFlash * 2.2);
+      wctx.save();
+      wctx.globalCompositeOperation = "lighter";
+      wctx.strokeStyle = `rgba(255, 40, 80, ${a * 0.55})`;
+      wctx.lineWidth = 10;
+      wctx.strokeRect(6, 6, ww - 12, wh - 12);
+      wctx.strokeStyle = `rgba(255, 255, 255, ${a * 0.35})`;
+      wctx.lineWidth = 3;
+      wctx.strokeRect(10, 10, ww - 20, wh - 20);
+      wctx.restore();
+    }
     // …then shadows on the floor…
     drawFloorShadows(wctx, this.player, this.enemies, this.geoms, this.time);
     // …then shapes hovering above
@@ -1945,11 +2100,16 @@ wctx.save();
     main.fillRect(0, 0, main.canvas.width, main.canvas.height);
     main.drawImage(this.worldCanvas, 0, 0);
 
-    // ── 3) Bloom (tight + wide additive) ──────────────────
-    compositeBloom(main, this.worldCanvas, {
-      tight: this.bloomTight,
-      wide: this.bloomWide,
-    });
+    // ── 3) Bloom (tight + wide additive) + techno breath ─
+    compositeBloom(
+      main,
+      this.worldCanvas,
+      {
+        tight: this.bloomTight,
+        wide: this.bloomWide,
+      },
+      { pulse }
+    );
 
     // ── 4) Trauma chromatic fringe ────────────────────────
     compositeChromatic(main, this.worldCanvas, this.cam.trauma, dpr);

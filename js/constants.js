@@ -173,8 +173,9 @@ export const SHADOW_OX = 5;
 export const SHADOW_OY = 11;
 
 /**
- * Post-process / presentation pipeline (Phase A visual upgrade).
- * Tuned for sharp retina + soft bloom without washing the floor.
+ * Post-process / presentation pipeline.
+ * Sektori-leaning: hotter multi-hue grade, stronger neon bloom, techno breath,
+ * front-loaded debris. REDUCED_FLASH softens CA / bomb strobe / underlay pulse.
  */
 export const GFX = {
   /** Cap devicePixelRatio so 3× displays don’t melt GPUs */
@@ -183,50 +184,114 @@ export const GFX = {
   BLOOM_RES: 0.42,
   /** CSS filter blur radius in bloom-buffer pixels */
   BLOOM_BLUR_PX: 6,
-  BLOOM_BRIGHTNESS: 1.22,
-  BLOOM_CONTRAST: 1.12,
+  BLOOM_BRIGHTNESS: 1.3,
+  BLOOM_CONTRAST: 1.18,
   /** How hard bloom adds back onto the frame (lighter composite) */
-  BLOOM_STRENGTH: 0.32,
-  /** Second softer bloom pass strength (wide halo) — keep low so floor grid stays dark */
-  BLOOM_WIDE_STRENGTH: 0.12,
-  BLOOM_WIDE_BLUR_PX: 12,
+  BLOOM_STRENGTH: 0.4,
+  /** Second softer bloom pass strength (wide halo) */
+  BLOOM_WIDE_STRENGTH: 0.16,
+  BLOOM_WIDE_BLUR_PX: 14,
   BLOOM_WIDE_RES: 0.22,
   /** Trauma chromatic fringe */
-  CA_TRAUMA_MIN: 0.05,
-  CA_MAX_OFFSET_PX: 5,
-  CA_ALPHA: 0.32,
-  /** Mult color-grade (log-scaled intensity) */
+  CA_TRAUMA_MIN: 0.04,
+  CA_MAX_OFFSET_PX: 6,
+  CA_ALPHA: 0.34,
+  /** Mult color-grade — present but not floor-washing */
   GRADE_BASE_ALPHA: 0.1,
-  GRADE_MULT_ALPHA: 0.22,
+  GRADE_MULT_ALPHA: 0.26,
   /** Vignette edge darkness at mult=1 and high mult */
   VIGNETTE_BASE: 0.58,
-  VIGNETTE_MULT_EXTRA: 0.18,
+  VIGNETTE_MULT_EXTRA: 0.2,
+  /**
+   * Accessibility: damp flash-heavy effects (CA, bomb flash, underlay pulse).
+   * Toggle from console: GFX.REDUCED_FLASH = true
+   */
+  REDUCED_FLASH: false,
+  /**
+   * Fake techno BPM for grid/bloom breath (no true beat detection).
+   * Half-note @ 128 BPM ≈ 0.94s period.
+   */
+  TECHNO_BPM: 128,
+  /** Beats per full sine cycle (2 = half-note breath, 4 = whole-note) */
+  TECHNO_PULSE_BEATS: 2,
+  /** Grid major-beam alpha modulation depth (0..1) from techno pulse */
+  GRID_PULSE_DEPTH: 0.2,
+  /** Bloom strength modulation depth from techno pulse */
+  BLOOM_PULSE_DEPTH: 0.1,
+  /**
+   * Psychedelic underlay — accent only. Too high washes entity contrast.
+   * Keep dark floor dominant; shapes carry the color.
+   */
+  UNDERLAY_ALPHA: 0.09,
+  UNDERLAY_ALPHA_REDUCED: 0.035,
+  /**
+   * Enemy enter 0→1 timeline (Sektori outline telegraph):
+   * enter < OUTLINE_END → thick red stroke only, no collision
+   * then fill + neon solidify. Target ~450ms outline window.
+   */
+  ENEMY_OUTLINE_END: 0.58,
+  ENEMY_ENTER_RATE: 1.28,
+  /** Kill debris: prefer short hot streaks over lingering soft dots */
+  KILL_STREAK_LIFE: 0.26,
+  KILL_SOFT_LIFE: 0.32,
+};
+
+/**
+ * Classic arena morph (Sektori-style spatial pressure).
+ * Cycles topologies with a red danger telegraph before lock-in.
+ * Path levels stay static unless a level opts in later.
+ */
+export const MORPH = {
+  ENABLED_CLASSIC: true,
+  /** First morph warn starts after this many seconds of a Classic run */
+  FIRST_AT: 18,
+  /** Seconds between morph commits (warn is inside this window) */
+  INTERVAL: 12,
+  /** Red flash warning before topology locks */
+  WARN_SEC: 2.0,
+  /** Cycle of arena refs (wraps). Keep shapes fair on laptop. */
+  SHAPES: [
+    { topology: "rect" },
+    { topology: "rect_tight", params: { width: 1180, height: 700 } },
+    { topology: "corridor", params: { axis: "x", halfWidth: 195 } },
+    { topology: "rect_wide", params: { width: 1520, height: 600 } },
+    { topology: "cross", params: { armHalfWidth: 205 } },
+    { topology: "rect_tight", params: { width: 1000, height: 780 } },
+    { topology: "corridor", params: { axis: "y", halfWidth: 195 } },
+    { topology: "rect" },
+  ],
 };
 
 export const COLORS = {
   bg: "#020208",
   bgDeep: "#000005",
-  grid: "rgba(40, 120, 255, 0.16)",
-  gridMajor: "rgba(90, 190, 255, 0.32)",
-  gridGlow: "rgba(70, 170, 255, 0.5)",
-  player: "#5efcff",
-  playerGlow: "#2ad4ff",
+  // Grid: cyan primary with a touch of violet — not a purple wash
+  grid: "rgba(55, 130, 255, 0.17)",
+  gridMajor: "rgba(110, 170, 255, 0.34)",
+  gridGlow: "rgba(120, 160, 255, 0.48)",
+  player: "#7cfff0",
+  playerGlow: "#3ae8ff",
   playerCore: "#ffffff",
   bullet: "#ffffff",
-  bulletCore: "#a8f7ff",
+  bulletCore: "#b8fbff",
+  // Enemy cast: pure primaries/secondaries against void (Sektori multi-hue)
   wanderer: "#3dff7a",
-  diamond: "#2adfff",
-  spinner: "#d06bff",
+  diamond: "#1ae8ff",
+  spinner: "#d86bff",
   tank: "#ff9a2e",
-  snake: "#ff3db5",
-  pink: "#ff4da6",
-  splitter: "#b44dff",
-  void: "#6b5cff",
-  atom: "#c8b8ff",
-  geom: "#b8ff4a",
-  danger: "#ff3355",
+  snake: "#ff2eb8",
+  pink: "#ff3db8",
+  splitter: "#c24dff",
+  void: "#7a5cff",
+  atom: "#d4c4ff",
+  geom: "#e8ff5a",
+  /** Sacred threat telegraph — spawn outlines + danger only */
+  danger: "#ff1a3c",
   bomb: "#ffe14a",
   text: "#f2f6ff",
+  /** Future system tokens (selector / evolver) — semantic palette */
+  selector: "#3d8cff",
+  evolver: "#ffd84a",
 };
 
 // ── Dial C: Enemy roles (speeds for ~90–150s pressure) ───

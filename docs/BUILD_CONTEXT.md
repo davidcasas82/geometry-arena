@@ -191,11 +191,14 @@ Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu stil
 
 ## Visual / audio language
 
-- **Palette:** deep black, cyan `#5efcff`, magenta/purple accents, green geoms, yellow bombs
+- **Palette:** deep black void, hotter multi-hue neon (cyan player `#7cfff0`, pure enemy primaries, lime geoms `#e8ff5a`, sacred danger red `#ff1a3c` for telegraphs only)
 - **Logo:** Orbitron blackletter-style chrome gradients + extruded text-shadow; Press Start 2P for prompts/buttons
 - **Entities:** hover height + ground shadow for “above the grid” read
+- **Spawn telegraph (Sektori):** enemies enter as thick red outline wireframes (`enter < GFX.ENEMY_OUTLINE_END`, ~450ms) — no collision until solidify; then fill + neon
+- **Classic arena morph:** `MORPH` in constants — cycles topologies every ~12s after 18s with 2s red danger telegraph (`drawMorphDanger`); trap outside next shape = death (CRUSHED). Path levels static.
 - **Camera:** trauma shake with combat soft-cap + diminishing returns (dense kills don’t pin full earthquake); big events use `{ big: true }`; zoom punch on set pieces; menu camera drift  
-- **Presentation (Phase A):** DPR-scaled world buffer (cap 2×), dual-pass bloom, trauma chromatic fringe, mult color grade + stronger vignette (`GFX` in constants, `postfx.js`)  
+- **Presentation:** multi-hue underlay + violet/magenta grid, dual-pass bloom + techno breath, trauma CA, always-on mult heat grade, short kill debris (`GFX` / `MORPH` in constants)
+- **Accessibility:** `GFX.REDUCED_FLASH = true` (console) damps CA, bomb flash, underlay, bloom strength
 - **Touch / mobile:** dual virtual sticks (left move, right aim+auto-fire), BOMB/PAUSE fabs; gated by coarse pointer or narrow+touch — desktop unchanged (`input.bindTouchControls`, `body.touch-ui`)
 - **Splash dismiss:** iris `clip-path` wipe + scanline drift + `audio.splashDismiss()` sting (same user gesture unlocks AudioContext)
 - **Title ambient:** geom rain drifts on menu; PLAY fires `_playShipIntro` thruster burst

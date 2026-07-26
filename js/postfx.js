@@ -1,6 +1,7 @@
 /**
  * Screen-space presentation: bloom, chromatic fringe, mult color grade, vignette.
  * World is drawn into a DPR-scaled buffer; this module composites the final look.
+ * Sektori-leaning: hotter multi-hue grade, techno bloom breath, reduced-flash path.
  */
 
 import { GFX, WORLD_H, WORLD_W } from "./constants.js";
@@ -15,14 +16,29 @@ export function multGradeT(mult) {
 }
 
 /**
+ * Techno breath 0..1 from world time + fake BPM (no true beat detection).
+ * Used by bloom strength and grid major beams.
+ *
+ * Period = (60 / bpm) * beatsPerCycle seconds.
+ * Default half-note (2 beats) at 128 BPM ≈ 0.94s — a pump, not a 2Hz flicker.
+ */
+export function technoPulse(t = 0, bpm = GFX.TECHNO_BPM, beatsPerCycle = GFX.TECHNO_PULSE_BEATS) {
+  const b = Math.max(60, bpm || 128);
+  const beats = Math.max(0.5, beatsPerCycle || 2);
+  // ω = 2π / period = 2π * bpm / (60 * beats) = (bpm * π) / (30 * beats)
+  return 0.5 + 0.5 * Math.sin((t * b * Math.PI) / (30 * beats));
+}
+
+/**
  * Downsample + blur “bright” energy, then additive-composite onto the frame.
  * Uses two passes: tight bloom (detail) + wide halo (god-ray-ish soft light).
  *
  * @param {CanvasRenderingContext2D} mainCtx  final present context (device px)
  * @param {HTMLCanvasElement} worldCanvas    full world buffer
  * @param {{ tight: HTMLCanvasElement, wide: HTMLCanvasElement }} buffers
+ * @param {{ pulse?: number }} [opts] optional techno pulse 0..1
  */
-export function compositeBloom(mainCtx, worldCanvas, buffers) {
+export function compositeBloom(mainCtx, worldCanvas, buffers, opts = {}) {
   const { tight, wide } = buffers;
   const tw = tight.width;
   const th = tight.height;
@@ -34,6 +50,12 @@ export function compositeBloom(mainCtx, worldCanvas, buffers) {
   const wctx = wide.getContext("2d");
   if (!tctx || !wctx) return;
 
+  const pulse = opts.pulse != null ? opts.pulse : 0.5;
+  const breath = 1 + (pulse - 0.5) * 2 * (GFX.BLOOM_PULSE_DEPTH || 0);
+  const reduced = !!GFX.REDUCED_FLASH;
+  const tightStr = GFX.BLOOM_STRENGTH * breath * (reduced ? 0.72 : 1);
+  const wideStr = GFX.BLOOM_WIDE_STRENGTH * breath * (reduced ? 0.65 : 1);
+
   // ── Tight bloom (detail neon) ──────────────────────────
   tctx.setTransform(1, 0, 0, 1, 0, 0);
   tctx.clearRect(0, 0, tw, th);
@@ -43,7 +65,7 @@ export function compositeBloom(mainCtx, worldCanvas, buffers) {
 
   mainCtx.save();
   mainCtx.globalCompositeOperation = "lighter";
-  mainCtx.globalAlpha = GFX.BLOOM_STRENGTH;
+  mainCtx.globalAlpha = tightStr;
   mainCtx.imageSmoothingEnabled = true;
   mainCtx.drawImage(tight, 0, 0, worldCanvas.width, worldCanvas.height);
   mainCtx.restore();
@@ -59,7 +81,7 @@ export function compositeBloom(mainCtx, worldCanvas, buffers) {
 
     mainCtx.save();
     mainCtx.globalCompositeOperation = "lighter";
-    mainCtx.globalAlpha = GFX.BLOOM_WIDE_STRENGTH;
+    mainCtx.globalAlpha = wideStr;
     mainCtx.imageSmoothingEnabled = true;
     mainCtx.drawImage(wide, 0, 0, worldCanvas.width, worldCanvas.height);
     mainCtx.restore();
@@ -76,12 +98,13 @@ export function compositeBloom(mainCtx, worldCanvas, buffers) {
  * @param {number} dpr
  */
 export function compositeChromatic(mainCtx, worldCanvas, trauma, dpr) {
+  if (GFX.REDUCED_FLASH) return;
   const t = Math.min(1, Math.max(0, trauma || 0));
   if (t < GFX.CA_TRAUMA_MIN) return;
 
   const intensity = t * t;
   const offset = intensity * GFX.CA_MAX_OFFSET_PX * dpr;
-  const alpha = Math.min(0.4, intensity * GFX.CA_ALPHA);
+  const alpha = Math.min(0.42, intensity * GFX.CA_ALPHA);
 
   mainCtx.save();
   mainCtx.globalCompositeOperation = "screen";
@@ -89,11 +112,11 @@ export function compositeChromatic(mainCtx, worldCanvas, trauma, dpr) {
   mainCtx.imageSmoothingEnabled = true;
 
   // Warm / red fringe
-  mainCtx.filter = "sepia(1) saturate(6) hue-rotate(-35deg) brightness(1.15)";
+  mainCtx.filter = "sepia(1) saturate(7) hue-rotate(-40deg) brightness(1.18)";
   mainCtx.drawImage(worldCanvas, -offset, 0);
 
   // Cool / cyan fringe
-  mainCtx.filter = "sepia(1) saturate(6) hue-rotate(165deg) brightness(1.15)";
+  mainCtx.filter = "sepia(1) saturate(7) hue-rotate(165deg) brightness(1.18)";
   mainCtx.drawImage(worldCanvas, offset, 0);
 
   mainCtx.filter = "none";
@@ -102,7 +125,7 @@ export function compositeChromatic(mainCtx, worldCanvas, trauma, dpr) {
 
 /**
  * Mult-reactive color grade in world pixel space (caller sets dpr transform).
- * Cool cyan stage → electric → hot magenta as mult climbs.
+ * Cool cyan stage → electric violet → hot magenta/ember as mult climbs (techno heat).
  */
 export function drawColorGrade(ctx, mult = 1) {
   const t = multGradeT(mult);
@@ -119,34 +142,35 @@ export function drawColorGrade(ctx, mult = 1) {
     WORLD_W * 0.72
   );
 
-  // Center: always a touch of cyan “stage light”
-  const cr = Math.round(20 + t * 40);
-  const cg = Math.round(90 + t * 20);
-  const cb = Math.round(160 - t * 40);
+  // Center: cyan stage light → warmer core at high mult
+  const cr = Math.round(18 + t * 70);
+  const cg = Math.round(95 + t * 10);
+  const cb = Math.round(170 - t * 55);
   g.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, ${alpha * 0.55})`);
 
-  // Mid: electric violet as intensity rises
-  const mr = Math.round(40 + t * 120);
-  const mg = Math.round(60 - t * 20);
-  const mb = Math.round(140 + t * 40);
-  g.addColorStop(0.55, `rgba(${mr}, ${mg}, ${mb}, ${alpha * 0.7})`);
+  // Mid: electric violet / magenta as intensity rises
+  const mr = Math.round(50 + t * 150);
+  const mg = Math.round(50 - t * 25);
+  const mb = Math.round(150 + t * 50);
+  g.addColorStop(0.55, `rgba(${mr}, ${mg}, ${mb}, ${alpha * 0.72})`);
 
   // Edge: hot magenta / ember at high mult, deep navy at low
-  const er = Math.round(10 + t * 180);
-  const eg = Math.round(8 + t * 20);
-  const eb = Math.round(40 + t * 60);
+  const er = Math.round(12 + t * 200);
+  const eg = Math.round(6 + t * 30);
+  const eb = Math.round(45 + t * 70);
   g.addColorStop(1, `rgba(${er}, ${eg}, ${eb}, ${alpha})`);
 
   ctx.globalCompositeOperation = "overlay";
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-  // High mult: tiny additive warmth so neon “runs hot”
-  if (t > 0.25) {
+  // Mult-scaled heat only — avoid floor wash at low mult
+  if (t > 0.18) {
+    const heat = t - 0.18;
     ctx.globalCompositeOperation = "lighter";
-    ctx.fillStyle = `rgba(255, 60, 140, ${(t - 0.25) * 0.055})`;
+    ctx.fillStyle = `rgba(255, 40, 140, ${heat * 0.07})`;
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-    ctx.fillStyle = `rgba(80, 200, 255, ${(1 - t) * 0.03})`;
+    ctx.fillStyle = `rgba(120, 50, 255, ${heat * 0.04})`;
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
   }
 
@@ -179,7 +203,7 @@ export function drawPostVignette(ctx, mult = 1) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-  // Subtle cool rim light so vignette doesn’t feel like pure dirt
+  // Subtle multi-hue rim so vignette doesn’t feel like pure dirt
   ctx.globalCompositeOperation = "lighter";
   const rim = ctx.createRadialGradient(
     WORLD_W / 2,
@@ -191,7 +215,10 @@ export function drawPostVignette(ctx, mult = 1) {
   );
   rim.addColorStop(0, "rgba(0,0,0,0)");
   rim.addColorStop(0.75, "rgba(0,0,0,0)");
-  rim.addColorStop(1, `rgba(40, 120, 220, ${0.04 + t * 0.03})`);
+  const rr = Math.round(40 + t * 80);
+  const rg = Math.round(100 - t * 40);
+  const rb = Math.round(220 - t * 40);
+  rim.addColorStop(1, `rgba(${rr}, ${rg}, ${rb}, ${0.045 + t * 0.035})`);
   ctx.fillStyle = rim;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
   ctx.restore();

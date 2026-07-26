@@ -7,6 +7,7 @@ import {
   GEOM_MAGNET_RANGE,
   GEOM_MAGNET_SPEED,
   GEOM_RADIUS,
+  GFX,
   PLAYER_ACCEL,
   PLAYER_DECEL,
   PLAYER_RADIUS,
@@ -283,7 +284,11 @@ export function updateEnemies(enemies, player, dt, elapsed = 0) {
   for (const e of enemies) {
     if (e.dead) continue;
 
-    if (e.enter < 1) e.enter = Math.min(1, e.enter + dt * 3.2);
+    // Outline telegraph then solidify (rate from GFX — Sektori-style spawn read)
+    if (e.enter < 1) {
+      const rate = GFX.ENEMY_ENTER_RATE ?? 2.6;
+      e.enter = Math.min(1, e.enter + dt * rate);
+    }
 
     // Formation approach: drift inward as a group before full seek AI
     // Keeps rows/columns readable for a beat so sweeping fire feels great
