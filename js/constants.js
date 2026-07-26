@@ -146,7 +146,14 @@ export const GEOM_MULT = 1;
 export const GEOM_RADIUS = 3.2;
 export const GEOM_MAGNET_RANGE = 175;
 export const GEOM_MAGNET_SPEED = 380;
-export const GEOM_LIFE = 14;
+/**
+ * Geom lifetime (seconds). Must be short enough that clearing a pack then
+ * leisurely vacuuming is a bad plan — force risk/reward dives for mult.
+ * Was 14s (felt permanent). GW energy: grab now or lose the stack.
+ */
+export const GEOM_LIFE = 5.2;
+/** Start blinking/fading when remaining life is below this (seconds). */
+export const GEOM_FADE_SEC = 1.35;
 export const GEOM_VACUUM_MILESTONES = [5, 10, 15, 25, 40, 60, 80, 100, 150, 200, 300, 500];
 export const BOARD_CLEAR_BASE = 500;
 export const BOARD_CLEAR_PER_MULT = 40;

@@ -14,7 +14,24 @@ import {
   WORLD_H,
   WORLD_W,
 } from "./constants.js";
+import { clampEntityObject, createDefaultArena, pickSpawnEdge } from "./arenas.js";
 import { clampToWorld, normalize, separate } from "./physics.js";
+
+/** @type {import('./arenas.js').ArenaInstance|null} */
+let _activeArena = null;
+
+/** Set arena used by player/enemy bound clamps (Game owns lifecycle). */
+export function setEntityArena(arena) {
+  _activeArena = arena || null;
+}
+
+export function getEntityArena() {
+  return _activeArena;
+}
+
+function arenaOrDefault() {
+  return _activeArena || createDefaultArena();
+}
 
 export function createPlayer(x = WORLD_W / 2, y = WORLD_H / 2) {
   return {
@@ -47,9 +64,14 @@ export function updatePlayer(player, move, aimAngle, dt, firing) {
 
   player.x += player.vx * dt;
   player.y += player.vy * dt;
-  clampToWorld(player, WORLD_W, WORLD_H);
-  if (player.x <= player.r || player.x >= WORLD_W - player.r) player.vx = 0;
-  if (player.y <= player.r || player.y >= WORLD_H - player.r) player.vy = 0;
+  const arena = arenaOrDefault();
+  if (arena.wraps || arena.topology !== "rect") {
+    clampEntityObject(player, arena);
+  } else {
+    clampToWorld(player, arena.worldW, arena.worldH);
+    if (player.x <= player.r || player.x >= arena.worldW - player.r) player.vx = 0;
+    if (player.y <= player.r || player.y >= arena.worldH - player.r) player.vy = 0;
+  }
 
   player.angle = aimAngle;
 
@@ -74,17 +96,27 @@ export function createBullet(x, y, angle) {
 }
 
 export function updateBullets(bullets, dt) {
+  const arena = arenaOrDefault();
+  const w = arena.worldW;
+  const h = arena.worldH;
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.life -= dt;
     b.x += b.vx * dt;
     b.y += b.vy * dt;
+    if (arena.wraps) {
+      // Torus: wrap forever until lifetime ends
+      b.x = ((b.x % w) + w) % w;
+      b.y = ((b.y % h) + h) % h;
+      if (b.life <= 0 || b.dead) bullets.splice(i, 1);
+      continue;
+    }
     if (
       b.life <= 0 ||
       b.x < -20 ||
       b.y < -20 ||
-      b.x > WORLD_W + 20 ||
-      b.y > WORLD_H + 20 ||
+      b.x > w + 20 ||
+      b.y > h + 20 ||
       b.dead
     ) {
       bullets.splice(i, 1);
@@ -95,13 +127,16 @@ export function updateBullets(bullets, dt) {
 export function createGeom(x, y) {
   const ang = Math.random() * Math.PI * 2;
   const sp = 50 + Math.random() * 100;
+  // Slight jitter so packs don't vanish in lockstep
+  const life = GEOM_LIFE * (0.88 + Math.random() * 0.24);
   return {
     x,
     y,
     vx: Math.cos(ang) * sp,
     vy: Math.sin(ang) * sp,
     r: GEOM_RADIUS,
-    life: GEOM_LIFE,
+    life,
+    maxLife: life,
     dead: false,
   };
 }
@@ -144,12 +179,9 @@ export function updateGeoms(geoms, player, dt, mult = 1, vacuumBoost = 0) {
 }
 
 function edgeSpawn() {
-  const margin = 44;
-  const side = Math.floor(Math.random() * 4);
-  if (side === 0) return { x: Math.random() * WORLD_W, y: -margin };
-  if (side === 1) return { x: Math.random() * WORLD_W, y: WORLD_H + margin };
-  if (side === 2) return { x: -margin, y: Math.random() * WORLD_H };
-  return { x: WORLD_W + margin, y: Math.random() * WORLD_H };
+  const arena = arenaOrDefault();
+  const p = pickSpawnEdge(arena);
+  return { x: p.x, y: p.y };
 }
 
 export function spawnEnemy(typeName, elapsed = 0, at = null) {
@@ -194,7 +226,8 @@ export function spawnEnemy(typeName, elapsed = 0, at = null) {
     enemy.spacing = spacing;
     enemy.history = [];
     enemy.segCount = n;
-    const toCenter = normalize(WORLD_W / 2 - pos.x, WORLD_H / 2 - pos.y);
+    const ar = arenaOrDefault();
+    const toCenter = normalize(ar.worldW / 2 - pos.x, ar.worldH / 2 - pos.y);
     for (let i = 0; i < n * spacing; i++) {
       enemy.history.push({
         x: pos.x - toCenter.x * i,
@@ -260,10 +293,18 @@ export function updateEnemies(enemies, player, dt, elapsed = 0) {
       e.x += e.approach.x * spd * dt;
       e.y += e.approach.y * spd * dt;
       e.angle = Math.atan2(e.approach.y, e.approach.x);
-      // Still clamp soft bounds
-      if (e.x > -50 && e.x < WORLD_W + 50 && e.y > -50 && e.y < WORLD_H + 50) {
-        e.x = Math.max(-60, Math.min(WORLD_W + 60, e.x));
-        e.y = Math.max(-60, Math.min(WORLD_H + 60, e.y));
+      // Soft bounds during approach; full arena clamp after enter
+      {
+        const ar = arenaOrDefault();
+        const w = ar.worldW;
+        const h = ar.worldH;
+        if (ar.wraps) {
+          e.x = ((e.x % w) + w) % w;
+          e.y = ((e.y % h) + h) % h;
+        } else if (e.x > -50 && e.x < w + 50 && e.y > -50 && e.y < h + 50) {
+          e.x = Math.max(-60, Math.min(w + 60, e.x));
+          e.y = Math.max(-60, Math.min(h + 60, e.y));
+        }
       }
       continue;
     }
@@ -390,9 +431,20 @@ export function updateEnemies(enemies, player, dt, elapsed = 0) {
       e.spin += dt * 8;
     }
 
-    if (e.x > -50 && e.x < WORLD_W + 50 && e.y > -50 && e.y < WORLD_H + 50) {
-      e.x = Math.max(-60, Math.min(WORLD_W + 60, e.x));
-      e.y = Math.max(-60, Math.min(WORLD_H + 60, e.y));
+    {
+      const ar = arenaOrDefault();
+      const w = ar.worldW;
+      const h = ar.worldH;
+      if (ar.wraps) {
+        e.x = ((e.x % w) + w) % w;
+        e.y = ((e.y % h) + h) % h;
+      } else if (ar.topology !== "rect") {
+        // Keep enemies in playable space (donut/cross/corridor walls)
+        clampEntityObject(e, ar);
+      } else if (e.x > -50 && e.x < w + 50 && e.y > -50 && e.y < h + 50) {
+        e.x = Math.max(-60, Math.min(w + 60, e.x));
+        e.y = Math.max(-60, Math.min(h + 60, e.y));
+      }
     }
   }
 

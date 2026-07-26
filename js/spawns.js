@@ -14,6 +14,10 @@
 
 import { PHRASE, SAFE_OPENING_SEC, WORLD_H, WORLD_W } from "./constants.js";
 
+function dimsOf(worldW = WORLD_W, worldH = WORLD_H) {
+  return { worldW: worldW ?? WORLD_W, worldH: worldH ?? WORLD_H };
+}
+
 const MARGIN = 48;
 
 /** @typedef {{ type: string, x: number, y: number, delay: number, approach?: {x:number,y:number} }} SpawnJob */
@@ -36,9 +40,9 @@ function randInt(a, b) {
 }
 
 /** Unit vector from edge point toward arena center (readable entry). */
-function towardCenter(x, y) {
-  const cx = WORLD_W / 2 - x;
-  const cy = WORLD_H / 2 - y;
+function towardCenter(x, y, worldW = WORLD_W, worldH = WORLD_H) {
+  const cx = worldW / 2 - x;
+  const cy = worldH / 2 - y;
   const l = Math.hypot(cx, cy) || 1;
   return { x: cx / l, y: cy / l };
 }
@@ -58,7 +62,23 @@ function offsetJobs(jobs, delayAdd) {
  * Evenly spaced line along one edge — classic “sweep the row” pattern.
  * @param {0|1|2|3} side 0=top 1=bottom 2=left 3=right
  */
-export function formationEdgeLine(type, count, side, stagger = 0.08) {
+/**
+ * Evenly spaced line along one edge — classic “sweep the row” pattern.
+ * @param {0|1|2|3} side 0=top 1=bottom 2=left 3=right
+ * @param {number} [stagger]
+ * @param {number|{worldW?:number,worldH?:number,arena?:object}} [worldW]
+ * @param {number} [worldH]
+ */
+export function formationEdgeLine(type, count, side, stagger = 0.08, worldW = WORLD_W, worldH = WORLD_H) {
+  if (worldW && typeof worldW === "object") {
+    const d = dimsOf(worldW.worldW ?? worldW.arena?.worldW, worldW.worldH ?? worldW.arena?.worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  } else {
+    const d = dimsOf(worldW, worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  }
   /** @type {SpawnJob[]} */
   const jobs = [];
   const n = Math.max(2, count);
@@ -68,19 +88,19 @@ export function formationEdgeLine(type, count, side, stagger = 0.08) {
     let x;
     let y;
     if (side === 0) {
-      x = u * WORLD_W;
+      x = u * worldW;
       y = -MARGIN;
     } else if (side === 1) {
-      x = u * WORLD_W;
-      y = WORLD_H + MARGIN;
+      x = u * worldW;
+      y = worldH + MARGIN;
     } else if (side === 2) {
       x = -MARGIN;
-      y = u * WORLD_H;
+      y = u * worldH;
     } else {
-      x = WORLD_W + MARGIN;
-      y = u * WORLD_H;
+      x = worldW + MARGIN;
+      y = u * worldH;
     }
-    jobs.push({ type, x, y, delay: i * stagger, approach: towardCenter(x, y) });
+    jobs.push({ type, x, y, delay: i * stagger, approach: towardCenter(x, y, worldW, worldH) });
   }
   return jobs;
 }
@@ -88,7 +108,16 @@ export function formationEdgeLine(type, count, side, stagger = 0.08) {
 /**
  * Column / single-file from one edge point — follow-the-leader stream.
  */
-export function formationColumn(type, count, side, stagger = 0.14) {
+export function formationColumn(type, count, side, stagger = 0.14, worldW = WORLD_W, worldH = WORLD_H) {
+  if (worldW && typeof worldW === "object") {
+    const d = dimsOf(worldW.worldW ?? worldW.arena?.worldW, worldW.worldH ?? worldW.arena?.worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  } else {
+    const d = dimsOf(worldW, worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  }
   /** @type {SpawnJob[]} */
   const jobs = [];
   const n = Math.max(2, count);
@@ -98,20 +127,20 @@ export function formationColumn(type, count, side, stagger = 0.14) {
   let stepX = 0;
   let stepY = 0;
   if (side === 0) {
-    baseX = mid * WORLD_W;
+    baseX = mid * worldW;
     baseY = -MARGIN;
     stepY = -22;
   } else if (side === 1) {
-    baseX = mid * WORLD_W;
-    baseY = WORLD_H + MARGIN;
+    baseX = mid * worldW;
+    baseY = worldH + MARGIN;
     stepY = 22;
   } else if (side === 2) {
     baseX = -MARGIN;
-    baseY = mid * WORLD_H;
+    baseY = mid * worldH;
     stepX = -22;
   } else {
-    baseX = WORLD_W + MARGIN;
-    baseY = mid * WORLD_H;
+    baseX = worldW + MARGIN;
+    baseY = mid * worldH;
     stepX = 22;
   }
   for (let i = 0; i < n; i++) {
@@ -122,7 +151,7 @@ export function formationColumn(type, count, side, stagger = 0.14) {
       x,
       y,
       delay: i * stagger,
-      approach: towardCenter(baseX, baseY),
+      approach: towardCenter(baseX, baseY, worldW, worldH),
     });
   }
   return jobs;
@@ -132,7 +161,16 @@ export function formationColumn(type, count, side, stagger = 0.14) {
  * Corner pocket along both edges that meet at a corner.
  * corner: 0=TL 1=TR 2=BL 3=BR
  */
-export function formationCornerArc(type, count, corner, stagger = 0.07) {
+export function formationCornerArc(type, count, corner, stagger = 0.07, worldW = WORLD_W, worldH = WORLD_H) {
+  if (worldW && typeof worldW === "object") {
+    const d = dimsOf(worldW.worldW ?? worldW.arena?.worldW, worldW.worldH ?? worldW.arena?.worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  } else {
+    const d = dimsOf(worldW, worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  }
   /** @type {SpawnJob[]} */
   const jobs = [];
   const n = Math.max(3, count);
@@ -145,19 +183,19 @@ export function formationCornerArc(type, count, corner, stagger = 0.07) {
     let x;
     let y;
     if (corner === 0) {
-      x = t * WORLD_W;
+      x = t * worldW;
       y = -MARGIN;
     } else if (corner === 1) {
-      x = WORLD_W - t * WORLD_W;
+      x = worldW - t * worldW;
       y = -MARGIN;
     } else if (corner === 2) {
-      x = t * WORLD_W;
-      y = WORLD_H + MARGIN;
+      x = t * worldW;
+      y = worldH + MARGIN;
     } else {
-      x = WORLD_W - t * WORLD_W;
-      y = WORLD_H + MARGIN;
+      x = worldW - t * worldW;
+      y = worldH + MARGIN;
     }
-    jobs.push({ type, x, y, delay: i * stagger, approach: towardCenter(x, y) });
+    jobs.push({ type, x, y, delay: i * stagger, approach: towardCenter(x, y, worldW, worldH) });
   }
   for (let i = 0; i < nB; i++) {
     const t = along(i, nB);
@@ -165,34 +203,36 @@ export function formationCornerArc(type, count, corner, stagger = 0.07) {
     let y;
     if (corner === 0) {
       x = -MARGIN;
-      y = t * WORLD_H;
+      y = t * worldH;
     } else if (corner === 1) {
-      x = WORLD_W + MARGIN;
-      y = t * WORLD_H;
+      x = worldW + MARGIN;
+      y = t * worldH;
     } else if (corner === 2) {
       x = -MARGIN;
-      y = WORLD_H - t * WORLD_H;
+      y = worldH - t * worldH;
     } else {
-      x = WORLD_W + MARGIN;
-      y = WORLD_H - t * WORLD_H;
+      x = worldW + MARGIN;
+      y = worldH - t * worldH;
     }
     jobs.push({
       type,
       x,
       y,
       delay: (nA + i) * stagger * 0.85,
-      approach: towardCenter(x, y),
+      approach: towardCenter(x, y, worldW, worldH),
     });
   }
   return jobs;
 }
 
 /** Pincer: two opposite edge lines at once. */
-export function formationPincer(type, countPerSide, axis = "horizontal", stagger = 0.06) {
+export function formationPincer(type, countPerSide, axis = "horizontal", stagger = 0.06, worldW = WORLD_W, worldH = WORLD_H) {
+  const worldOpts =
+    worldW && typeof worldW === "object" ? worldW : { worldW, worldH };
   const a = axis === "horizontal" ? 0 : 2;
   const b = a + 1;
-  const left = formationEdgeLine(type, countPerSide, a, stagger);
-  const right = formationEdgeLine(type, countPerSide, b, stagger);
+  const left = formationEdgeLine(type, countPerSide, a, stagger, worldOpts);
+  const right = formationEdgeLine(type, countPerSide, b, stagger, worldOpts);
   /** @type {SpawnJob[]} */
   const jobs = [];
   const n = Math.max(left.length, right.length);
@@ -204,11 +244,13 @@ export function formationPincer(type, countPerSide, axis = "horizontal", stagger
 }
 
 /** Arena-edge ring from all four sides. */
-export function formationRing(type, perSide, stagger = 0.05) {
+export function formationRing(type, perSide, stagger = 0.05, worldW = WORLD_W, worldH = WORLD_H) {
+  const worldOpts =
+    worldW && typeof worldW === "object" ? worldW : { worldW, worldH };
   /** @type {SpawnJob[]} */
   const jobs = [];
   for (let side = 0; side < 4; side++) {
-    const line = formationEdgeLine(type, perSide, side, 0);
+    const line = formationEdgeLine(type, perSide, side, 0, worldOpts);
     for (let i = 0; i < line.length; i++) {
       jobs.push({
         ...line[i],
@@ -220,7 +262,16 @@ export function formationRing(type, perSide, stagger = 0.05) {
 }
 
 /** Diagonal zipper: alternate top and side. */
-export function formationZipper(type, count, stagger = 0.1) {
+export function formationZipper(type, count, stagger = 0.1, worldW = WORLD_W, worldH = WORLD_H) {
+  if (worldW && typeof worldW === "object") {
+    const d = dimsOf(worldW.worldW ?? worldW.arena?.worldW, worldW.worldH ?? worldW.arena?.worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  } else {
+    const d = dimsOf(worldW, worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  }
   /** @type {SpawnJob[]} */
   const jobs = [];
   for (let i = 0; i < count; i++) {
@@ -228,18 +279,18 @@ export function formationZipper(type, count, stagger = 0.1) {
     if (i % 2 === 0) {
       jobs.push({
         type,
-        x: t * WORLD_W,
+        x: t * worldW,
         y: -MARGIN,
         delay: i * stagger,
-        approach: towardCenter(t * WORLD_W, 0),
+        approach: towardCenter(t * worldW, 0, worldW, worldH),
       });
     } else {
       jobs.push({
         type,
         x: -MARGIN,
-        y: t * WORLD_H,
+        y: t * worldH,
         delay: i * stagger,
-        approach: towardCenter(0, t * WORLD_H),
+        approach: towardCenter(0, t * worldH, worldW, worldH),
       });
     }
   }
@@ -247,25 +298,34 @@ export function formationZipper(type, count, stagger = 0.1) {
 }
 
 /** Single random edge spawn. */
-export function formationSingle(type) {
+export function formationSingle(type, worldW = WORLD_W, worldH = WORLD_H) {
+  if (worldW && typeof worldW === "object") {
+    const d = dimsOf(worldW.worldW ?? worldW.arena?.worldW, worldW.worldH ?? worldW.arena?.worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  } else {
+    const d = dimsOf(worldW, worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  }
   const side = Math.floor(Math.random() * 4);
   const u = 0.15 + Math.random() * 0.7;
   let x;
   let y;
   if (side === 0) {
-    x = u * WORLD_W;
+    x = u * worldW;
     y = -MARGIN;
   } else if (side === 1) {
-    x = u * WORLD_W;
-    y = WORLD_H + MARGIN;
+    x = u * worldW;
+    y = worldH + MARGIN;
   } else if (side === 2) {
     x = -MARGIN;
-    y = u * WORLD_H;
+    y = u * worldH;
   } else {
-    x = WORLD_W + MARGIN;
-    y = u * WORLD_H;
+    x = worldW + MARGIN;
+    y = u * worldH;
   }
-  return [{ type, x, y, delay: 0, approach: towardCenter(x, y) }];
+  return [{ type, x, y, delay: 0, approach: towardCenter(x, y, worldW, worldH) }];
 }
 
 /**
@@ -277,14 +337,25 @@ export function formationPlayerCircle(
   px,
   py,
   radius = PHRASE.CIRCLE_RADIUS,
-  stagger = 0.04
+  stagger = 0.04,
+  worldW = WORLD_W,
+  worldH = WORLD_H
 ) {
+  if (worldW && typeof worldW === "object") {
+    const d = dimsOf(worldW.worldW ?? worldW.arena?.worldW, worldW.worldH ?? worldW.arena?.worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  } else {
+    const d = dimsOf(worldW, worldH);
+    worldW = d.worldW;
+    worldH = d.worldH;
+  }
   /** @type {SpawnJob[]} */
   const jobs = [];
   const n = Math.max(6, count);
   const r = radius;
-  const cx = clamp(px, r + 24, WORLD_W - r - 24);
-  const cy = clamp(py, r + 24, WORLD_H - r - 24);
+  const cx = clamp(px, r + 24, worldW - r - 24);
+  const cy = clamp(py, r + 24, worldH - r - 24);
   const phase = Math.random() * Math.PI * 2;
   for (let i = 0; i < n; i++) {
     const ang = phase + (i / n) * Math.PI * 2;
@@ -302,11 +373,13 @@ export function formationPlayerCircle(
 }
 
 /** 4-corner flood — jacks-like path-cut fantasy. */
-export function formationCornerFlood(type, perCorner = PHRASE.FLOOD_PER_CORNER, stagger = 0.05) {
+export function formationCornerFlood(type, perCorner = PHRASE.FLOOD_PER_CORNER, stagger = 0.05, worldW = WORLD_W, worldH = WORLD_H) {
+  const worldOpts =
+    worldW && typeof worldW === "object" ? worldW : { worldW, worldH };
   /** @type {SpawnJob[]} */
   const jobs = [];
   for (let corner = 0; corner < 4; corner++) {
-    const arc = formationCornerArc(type, perCorner, corner, stagger);
+    const arc = formationCornerArc(type, perCorner, corner, stagger, worldOpts);
     for (let i = 0; i < arc.length; i++) {
       jobs.push({
         ...arc[i],
@@ -318,14 +391,15 @@ export function formationCornerFlood(type, perCorner = PHRASE.FLOOD_PER_CORNER, 
 }
 
 /** Edge line + delayed opposite edge echo. */
-export function formationOppositeEcho(type, count, side, echoDelay = 0.85, stagger = 0.07) {
-  const first = formationEdgeLine(type, count, side, stagger);
+export function formationOppositeEcho(type, count, side, echoDelay = 0.85, stagger = 0.07, worldW = WORLD_W, worldH = WORLD_H) {
+  const worldOpts =
+    worldW && typeof worldW === "object" ? worldW : { worldW, worldH };
+  const first = formationEdgeLine(type, count, side, stagger, worldOpts);
   const opp = side < 2 ? side ^ 1 : 2 + ((side - 2) ^ 1);
-  const second = offsetJobs(formationEdgeLine(type, count, opp, stagger), echoDelay);
+  const second = offsetJobs(formationEdgeLine(type, count, opp, stagger, worldOpts), echoDelay);
   return first.concat(second);
 }
 
-/** Drop jobs that would spawn on top of the player. */
 export function filterJobsNearPlayer(jobs, player, minDist = PHRASE.SAFE_SPAWN_DIST) {
   if (!player) return jobs;
   const d2 = minDist * minDist;
@@ -375,8 +449,54 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
   const safeOpening = ctx.safeOpening ?? SAFE_OPENING_SEC;
   const seen = ctx.seenIntros instanceof Set ? ctx.seenIntros : new Set(ctx.seenIntros || []);
   const player = ctx.player || null;
+  const worldOpts =
+    ctx.arena || ctx.worldW || ctx.worldH
+      ? {
+          worldW: ctx.worldW ?? ctx.arena?.worldW ?? WORLD_W,
+          worldH: ctx.worldH ?? ctx.arena?.worldH ?? WORLD_H,
+          arena: ctx.arena,
+        }
+      : null;
   const d = clamp(difficulty01, 0, 1);
   const side = Math.floor(Math.random() * 4);
+
+  const wo = worldOpts;
+  // Bind real formation fns (do not recurse through F.*)
+  const _edgeLine = formationEdgeLine;
+  const _column = formationColumn;
+  const _cornerArc = formationCornerArc;
+  const _pincer = formationPincer;
+  const _ring = formationRing;
+  const _zipper = formationZipper;
+  const _single = formationSingle;
+  const _playerCircle = formationPlayerCircle;
+  const _cornerFlood = formationCornerFlood;
+  const _oppositeEcho = formationOppositeEcho;
+  const F = {
+    edgeLine: (type, count, s, stagger) =>
+      wo ? _edgeLine(type, count, s, stagger, wo) : _edgeLine(type, count, s, stagger),
+    column: (type, count, s, stagger) =>
+      wo ? _column(type, count, s, stagger, wo) : _column(type, count, s, stagger),
+    cornerArc: (type, count, c, stagger) =>
+      wo ? _cornerArc(type, count, c, stagger, wo) : _cornerArc(type, count, c, stagger),
+    pincer: (type, n, axis, stagger) =>
+      wo ? _pincer(type, n, axis, stagger, wo) : _pincer(type, n, axis, stagger),
+    ring: (type, per, stagger) =>
+      wo ? _ring(type, per, stagger, wo) : _ring(type, per, stagger),
+    zipper: (type, count, stagger) =>
+      wo ? _zipper(type, count, stagger, wo) : _zipper(type, count, stagger),
+    single: (type) => (wo ? _single(type, wo) : _single(type)),
+    playerCircle: (type, n, px, py, r, stagger) =>
+      wo
+        ? _playerCircle(type, n, px, py, r, stagger, wo)
+        : _playerCircle(type, n, px, py, r, stagger),
+    cornerFlood: (type, per, stagger) =>
+      wo ? _cornerFlood(type, per, stagger, wo) : _cornerFlood(type, per, stagger),
+    oppositeEcho: (type, count, s, echo, stagger) =>
+      wo
+        ? _oppositeEcho(type, count, s, echo, stagger, wo)
+        : _oppositeEcho(type, count, s, echo, stagger),
+  };
   const corner = Math.floor(Math.random() * 4);
   const axis = Math.random() < 0.5 ? "horizontal" : "vertical";
 
@@ -385,12 +505,12 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
     const count = 2 + Math.floor(Math.random() * 2);
     const roll = Math.random();
     if (roll < 0.55) {
-      return phraseOf("open-line", "soft", [formationEdgeLine("wanderer", count, side, 0.14)]);
+      return phraseOf("open-line", "soft", [F.edgeLine("wanderer", count, side, 0.14)]);
     }
     if (roll < 0.9) {
-      return phraseOf("open-column", "soft", [formationColumn("wanderer", count, side, 0.18)]);
+      return phraseOf("open-column", "soft", [F.column("wanderer", count, side, 0.18)]);
     }
-    return phraseOf("open-single", "soft", [formationSingle("wanderer")]);
+    return phraseOf("open-single", "soft", [F.single("wanderer")]);
   }
 
   // First-unlock set pieces (once each)
@@ -403,8 +523,8 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
           "intro-pink",
           "setpiece",
           [
-            formationColumn("pink", 3, side, 0.2),
-            formationEdgeLine("wanderer", 3, (side + 2) % 4, 0.12),
+            F.column("pink", 3, side, 0.2),
+            F.edgeLine("wanderer", 3, (side + 2) % 4, 0.12),
           ],
           { label: "DASHERS", introKey: "pink" }
         ),
@@ -413,7 +533,7 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
       key: "spinner",
       at: 48,
       build: () =>
-        phraseOf("intro-spinner", "normal", [formationEdgeLine("spinner", 4, side, 0.12)], {
+        phraseOf("intro-spinner", "normal", [F.edgeLine("spinner", 4, side, 0.12)], {
           label: "ORBIT",
           introKey: "spinner",
         }),
@@ -425,7 +545,7 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
         phraseOf(
           "intro-pincer",
           "hard",
-          [formationPincer(moneyType(elapsed, pickType), 3, axis, 0.08)],
+          [F.pincer(moneyType(elapsed, pickType), 3, axis, 0.08)],
           { label: "PINCER", introKey: "pincer" }
         ),
     },
@@ -437,8 +557,8 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
           "intro-splitter",
           "setpiece",
           [
-            formationCornerArc("splitter", 3, corner, 0.14),
-            formationEdgeLine("wanderer", 3, side, 0.1),
+            F.cornerArc("splitter", 3, corner, 0.14),
+            F.edgeLine("wanderer", 3, side, 0.1),
           ],
           { label: "SPLITTERS", introKey: "splitter" }
         ),
@@ -451,8 +571,8 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
           "intro-snake",
           "setpiece",
           [
-            formationSingle("snake"),
-            formationEdgeLine("wanderer", 4, (side + 1) % 4, 0.1),
+            F.single("snake"),
+            F.edgeLine("wanderer", 4, (side + 1) % 4, 0.1),
           ],
           { label: "SNAKE", introKey: "snake" }
         ),
@@ -465,8 +585,8 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
           "intro-tank",
           "setpiece",
           [
-            formationSingle("tank"),
-            formationEdgeLine("diamond", 4, side, 0.09),
+            F.single("tank"),
+            F.edgeLine("diamond", 4, side, 0.09),
           ],
           { label: "TANK", introKey: "tank" }
         ),
@@ -479,8 +599,8 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
           "intro-void",
           "setpiece",
           [
-            formationSingle("void"),
-            formationColumn(fodderType(elapsed), 3, side, 0.16),
+            F.single("void"),
+            F.column(fodderType(elapsed), 3, side, 0.16),
           ],
           { label: "VOID", introKey: "void" }
         ),
@@ -508,7 +628,7 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
   if (canCircle) {
     const n = randInt(PHRASE.CIRCLE_COUNT_MIN, PHRASE.CIRCLE_COUNT_MAX);
     const type = fodderType(elapsed);
-    let jobs = formationPlayerCircle(type, n, player.x, player.y, PHRASE.CIRCLE_RADIUS, 0.035);
+    let jobs = F.playerCircle(type, n, player.x, player.y, PHRASE.CIRCLE_RADIUS, 0.035);
     jobs = filterJobsNearPlayer(jobs, player, PHRASE.SAFE_SPAWN_DIST * 0.55);
     if (jobs.length >= 6) {
       return phraseOf("circle", "setpiece", [jobs], {
@@ -525,7 +645,7 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
 
   if (canFlood) {
     const per = clamp(PHRASE.FLOOD_PER_CORNER + Math.floor(d * 2), 3, 6);
-    return phraseOf("flood", "hard", [formationCornerFlood(fodderType(elapsed), per, 0.045)], {
+    return phraseOf("flood", "hard", [F.cornerFlood(fodderType(elapsed), per, 0.045)], {
       label: "FLOOD",
       introKey: "flood-event",
     });
@@ -537,17 +657,17 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
     const count = 3 + Math.floor(Math.random() * 3);
     const roll = Math.random();
     if (roll < 0.4) {
-      return phraseOf("money-line", "normal", [formationEdgeLine(type, count, side, 0.1)]);
+      return phraseOf("money-line", "normal", [F.edgeLine(type, count, side, 0.1)]);
     }
     if (roll < 0.65) {
-      return phraseOf("money-corner", "normal", [formationCornerArc(type, count, corner, 0.09)]);
+      return phraseOf("money-corner", "normal", [F.cornerArc(type, count, corner, 0.09)]);
     }
     if (roll < 0.85) {
       return phraseOf("money-echo", "normal", [
-        formationOppositeEcho(type, Math.max(3, count - 1), side, 0.9, 0.1),
+        F.oppositeEcho(type, Math.max(3, count - 1), side, 0.9, 0.1),
       ]);
     }
-    return phraseOf("money-column", "soft", [formationColumn(type, count, side, 0.14)]);
+    return phraseOf("money-column", "soft", [F.column(type, count, side, 0.14)]);
   }
 
   // Mid / late improvisation — homogeneous by default
@@ -564,58 +684,58 @@ export function buildPhrase(elapsed, difficulty01, pickType, ctx = {}) {
   const roll = Math.random();
 
   if (elapsed > 100 && Math.random() < 0.1 && !ctx.hasVoid) {
-    return phraseOf("solo-void", "setpiece", [formationSingle("void")], { label: "VOID" });
+    return phraseOf("solo-void", "setpiece", [F.single("void")], { label: "VOID" });
   }
   if (elapsed > 90 && primary === "tank" && Math.random() < 0.5) {
     return phraseOf("solo-tank", "hard", [
-      formationSingle("tank"),
-      formationEdgeLine(fodderType(elapsed), 3, side, 0.1),
+      F.single("tank"),
+      F.edgeLine(fodderType(elapsed), 3, side, 0.1),
     ]);
   }
   if (elapsed > 78 && primary === "snake" && Math.random() < 0.45) {
     return phraseOf("snake-lane", "hard", [
-      formationSingle("snake"),
-      formationEdgeLine(fodderType(elapsed), 4, (side + 2) % 4, 0.09),
+      F.single("snake"),
+      F.edgeLine(fodderType(elapsed), 4, (side + 2) % 4, 0.09),
     ]);
   }
 
   if (roll < 0.22) {
-    return phraseOf("line", "normal", [formationEdgeLine(primary, count, side, 0.07)]);
+    return phraseOf("line", "normal", [F.edgeLine(primary, count, side, 0.07)]);
   }
   if (roll < 0.38) {
     return phraseOf("column", "normal", [
-      formationColumn(primary, Math.min(count + 1, 10), side, 0.11),
+      F.column(primary, Math.min(count + 1, 10), side, 0.11),
     ]);
   }
   if (roll < 0.52) {
-    return phraseOf("corner", "normal", [formationCornerArc(primary, count, corner, 0.065)]);
+    return phraseOf("corner", "normal", [F.cornerArc(primary, count, corner, 0.065)]);
   }
   if (roll < 0.66) {
     return phraseOf(
       "pincer",
       "hard",
-      [formationPincer(primary, Math.max(2, Math.floor(count / 2)), axis, 0.055)],
+      [F.pincer(primary, Math.max(2, Math.floor(count / 2)), axis, 0.055)],
       { label: Math.random() < 0.35 ? "PINCER" : null }
     );
   }
   if (roll < 0.78) {
-    return phraseOf("zipper", "normal", [formationZipper(primary, count, 0.085)]);
+    return phraseOf("zipper", "normal", [F.zipper(primary, count, 0.085)]);
   }
   if (roll < 0.88 && elapsed > 70) {
     const per = clamp(2 + Math.floor(d * 2), 2, 4);
-    return phraseOf("ring", "hard", [formationRing(primary, per, 0.04)], {
+    return phraseOf("ring", "hard", [F.ring(primary, per, 0.04)], {
       label: Math.random() < 0.4 ? "RING" : null,
     });
   }
   if (roll < 0.94) {
     return phraseOf("echo", "normal", [
-      formationOppositeEcho(primary, Math.max(3, count - 1), side, 0.8, 0.065),
+      F.oppositeEcho(primary, Math.max(3, count - 1), side, 0.8, 0.065),
     ]);
   }
 
   // Rare chaos mix
   const secondary = pickType();
-  const line = formationEdgeLine(primary, count, side, 0.06);
+  const line = F.edgeLine(primary, count, side, 0.06);
   for (let i = 0; i < line.length; i++) {
     if (i % 2 === 1) line[i].type = secondary === "void" ? "diamond" : secondary;
   }

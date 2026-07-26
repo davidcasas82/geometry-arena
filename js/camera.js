@@ -58,28 +58,39 @@ export const CAM = {
   RECOIL_DECAY: 14,
 };
 
-export function createCamera() {
+export function createCamera(worldW = WORLD_W, worldH = WORLD_H) {
   return {
-    x: WORLD_W / 2,
-    y: WORLD_H / 2,
+    x: worldW / 2,
+    y: worldH / 2,
     zoom: CAM.BASE_ZOOM,
     trauma: 0,
     kickX: 0,
     kickY: 0,
     zoomPunch: 0,
     time: 0,
+    worldW,
+    worldH,
   };
 }
 
-export function resetCamera(cam) {
-  cam.x = WORLD_W / 2;
-  cam.y = WORLD_H / 2;
+export function resetCamera(cam, worldW = WORLD_W, worldH = WORLD_H) {
+  cam.worldW = worldW;
+  cam.worldH = worldH;
+  cam.x = worldW / 2;
+  cam.y = worldH / 2;
   cam.zoom = CAM.BASE_ZOOM;
   cam.trauma = 0;
   cam.kickX = 0;
   cam.kickY = 0;
   cam.zoomPunch = 0;
   cam.time = 0;
+}
+
+function camWorld(cam, view) {
+  return {
+    w: view?.worldW ?? cam?.worldW ?? WORLD_W,
+    h: view?.worldH ?? cam?.worldH ?? WORLD_H,
+  };
 }
 
 /**
@@ -122,10 +133,10 @@ export function recoil(cam, angle, strength = CAM.RECOIL) {
 /**
  * 0 at center, 1 when within EDGE_SOFT of a wall (per axis then max).
  */
-function edgeProximity(player) {
+function edgeProximity(player, worldW = WORLD_W, worldH = WORLD_H) {
   const s = CAM.EDGE_SOFT;
-  const ex = Math.max(0, Math.max(s - player.x, player.x - (WORLD_W - s)) / s);
-  const ey = Math.max(0, Math.max(s - player.y, player.y - (WORLD_H - s)) / s);
+  const ex = Math.max(0, Math.max(s - player.x, player.x - (worldW - s)) / s);
+  const ey = Math.max(0, Math.max(s - player.y, player.y - (worldH - s)) / s);
   return Math.max(0, Math.min(1, Math.max(ex, ey)));
 }
 
@@ -133,11 +144,11 @@ function edgeProximity(player) {
  * Visible half-extents in world units for the *on-screen* frame.
  * `visFrac*` < 1 when CSS cover-crop clips the canvas (phones).
  */
-function visibleHalf(zoom, visFracX = 1, visFracY = 1) {
+function visibleHalf(zoom, visFracX = 1, visFracY = 1, worldW = WORLD_W, worldH = WORLD_H) {
   const z = Math.max(0.5, zoom);
   return {
-    halfW: (WORLD_W / (2 * z)) * Math.max(0.35, Math.min(1, visFracX)),
-    halfH: (WORLD_H / (2 * z)) * Math.max(0.35, Math.min(1, visFracY)),
+    halfW: (worldW / (2 * z)) * Math.max(0.35, Math.min(1, visFracX)),
+    halfH: (worldH / (2 * z)) * Math.max(0.35, Math.min(1, visFracY)),
   };
 }
 
@@ -161,11 +172,11 @@ function clampToKeepPlayerVisible(tx, ty, player, halfW, halfH) {
 }
 
 /** Soft limit how far past the arena the view may drift. */
-function clampVoid(tx, ty, halfW, halfH) {
+function clampVoid(tx, ty, halfW, halfH, worldW = WORLD_W, worldH = WORLD_H) {
   const pad = CAM.VOID_PAD;
   return {
-    x: Math.max(halfW - pad, Math.min(WORLD_W - halfW + pad, tx)),
-    y: Math.max(halfH - pad, Math.min(WORLD_H - halfH + pad, ty)),
+    x: Math.max(halfW - pad, Math.min(worldW - halfW + pad, tx)),
+    y: Math.max(halfH - pad, Math.min(worldH - halfH + pad, ty)),
   };
 }
 
@@ -182,7 +193,10 @@ export function updateCamera(cam, player, aim, dt, view = null) {
 
   const visFracX = view?.visFracX ?? 1;
   const visFracY = view?.visFracY ?? 1;
-  const edge = edgeProximity(player);
+  const { w: worldW, h: worldH } = camWorld(cam, view);
+  cam.worldW = worldW;
+  cam.worldH = worldH;
+  const edge = edgeProximity(player, worldW, worldH);
   // Kill look-ahead / aim lean into walls so we don't push the ship off-frame
   const leadScale = 1 - edge * 0.92;
 
@@ -200,9 +214,9 @@ export function updateCamera(cam, player, aim, dt, view = null) {
   const targetZoom = Math.min(CAM.MAX_ZOOM, Math.max(CAM.MIN_ZOOM, base));
 
   {
-    const { halfW, halfH } = visibleHalf(targetZoom, visFracX, visFracY);
+    const { halfW, halfH } = visibleHalf(targetZoom, visFracX, visFracY, worldW, worldH);
     // Prefer not showing endless void, then hard-guarantee ship on screen
-    const voided = clampVoid(targetX, targetY, halfW, halfH);
+    const voided = clampVoid(targetX, targetY, halfW, halfH, worldW, worldH);
     const kept = clampToKeepPlayerVisible(voided.x, voided.y, player, halfW, halfH);
     targetX = kept.x;
     targetY = kept.y;
@@ -227,8 +241,8 @@ export function updateCamera(cam, player, aim, dt, view = null) {
 
   // Final hard clamp after lerp/zoom settle — ship must stay visible
   {
-    const { halfW, halfH } = visibleHalf(cam.zoom, visFracX, visFracY);
-    const voided = clampVoid(cam.x, cam.y, halfW, halfH);
+    const { halfW, halfH } = visibleHalf(cam.zoom, visFracX, visFracY, worldW, worldH);
+    const voided = clampVoid(cam.x, cam.y, halfW, halfH, worldW, worldH);
     const kept = clampToKeepPlayerVisible(voided.x, voided.y, player, halfW, halfH);
     cam.x = kept.x;
     cam.y = kept.y;
@@ -267,22 +281,28 @@ export function cameraShakeOffset(cam) {
  * @param {object} cam
  * @param {number} [dpr=1] device pixel ratio — scales into the backing buffer
  */
-export function applyCameraTransform(ctx, cam, dpr = 1) {
+export function applyCameraTransform(ctx, cam, dpr = 1, worldW = WORLD_W, worldH = WORLD_H) {
   const shake = cameraShakeOffset(cam);
   const z = cam.zoom;
+  const w = worldW ?? cam.worldW ?? WORLD_W;
+  const h = worldH ?? cam.worldH ?? WORLD_H;
   // Device-pixel center → world cam, with shake/rotation
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.translate((WORLD_W * dpr) / 2, (WORLD_H * dpr) / 2);
+  ctx.translate((w * dpr) / 2, (h * dpr) / 2);
   if (shake.rot) ctx.rotate(shake.rot);
   ctx.scale(z * dpr, z * dpr);
   ctx.translate(-cam.x + shake.x, -cam.y + shake.y);
 }
 
 /** Menu idle: gentle drift / breathing zoom */
-export function updateMenuCamera(cam, dt) {
+export function updateMenuCamera(cam, dt, worldW = WORLD_W, worldH = WORLD_H) {
   cam.time += dt;
-  const tx = WORLD_W / 2 + Math.sin(cam.time * 0.35) * 40;
-  const ty = WORLD_H / 2 + Math.cos(cam.time * 0.28) * 28;
+  const w = worldW ?? cam.worldW ?? WORLD_W;
+  const h = worldH ?? cam.worldH ?? WORLD_H;
+  cam.worldW = w;
+  cam.worldH = h;
+  const tx = w / 2 + Math.sin(cam.time * 0.35) * 40;
+  const ty = h / 2 + Math.cos(cam.time * 0.28) * 28;
   const k = 1 - Math.exp(-2 * dt);
   cam.x += (tx - cam.x) * k;
   cam.y += (ty - cam.y) * k;

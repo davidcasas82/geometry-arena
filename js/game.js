@@ -51,10 +51,17 @@ import {
 } from "./constants.js";
 import { AudioBus } from "./audio.js";
 import {
+  createArena,
+  createDefaultArena,
+  drawArena,
+  randomPlayablePoint,
+} from "./arenas.js";
+import {
   createBullet,
   createGeom,
   createPlayer,
   pickSpawnType,
+  setEntityArena,
   snakeSegments,
   spawnEnemy,
   spawnSplitterChildren,
@@ -83,6 +90,8 @@ import {
   recordDeath,
   recordRun,
 } from "./runs.js";
+import { computeStars, getLevel, getLevelTheme } from "./levels.js";
+import { createModeController } from "./modes.js";
 import { buildPhrase, filterJobsNearPlayer } from "./spawns.js";
 import {
   drawAfterimages,
@@ -184,6 +193,35 @@ export class Game {
     this.boardWasPopulated = false;
     this.clearCooldown = 0;
 
+    // ── Path shell (null = Classic Evolved endless) ────────
+    /** @type {"classic"|"path"} */
+    this.shell = "classic";
+    /** @type {import('./levels.js').LevelDef | null} */
+    this.pathLevel = null;
+    /** @type {ReturnType<typeof createModeController> | null} */
+    this.mode = null;
+/** @type {object | null} arena instance from arenas.js */
+    this.arena = createDefaultArena();
+    /** @type {{ w: number, h: number }} */
+    this.world = { w: this.arena.worldW, h: this.arena.worldH };
+    setEntityArena(this.arena);
+    /** @type {Set<string>} */
+    this.modeFlags = new Set();
+    this.pathAllowImprov = true;
+    this.pathScriptOnly = false;
+    this.pathEnding = false;
+    this.pathBossAlive = false;
+    this.pathBossKilled = false;
+    this._pathBossSeen = false;
+    this.pathOnTimeGates = 0;
+    /** Optional path rule overrides applied while pathLevel is set */
+    this.pathSoftCap = null;
+    this.pathSpawnRampSec = null;
+    this.pathSafeOpeningSec = null;
+    this.pathEnemyUnlockScale = null;
+    this.pathMaxEnemies = null;
+    this.pathScoreMult = 1;
+
     this.ui.updateScore(0);
     this.ui.updateMult(1);
     this.ui.updateLives(START_LIVES);
@@ -271,7 +309,11 @@ export class Game {
     };
   }
 
-  start() {
+start() {
+    // Classic Evolved endless — never gated by Path
+    this._clearPathRuntime();
+    this.shell = "classic";
+    this.setArena({ topology: "rect" });
     this.score = 0;
     this.lives = START_LIVES;
     this.bombs = START_BOMBS;
@@ -347,6 +389,238 @@ export class Game {
     this.particles.floater(px, py - 40, "GO", COLORS.player, 1.2);
   }
 
+  /** Reset Path-only runtime fields without touching Classic combat state. */
+  _clearPathRuntime() {
+    this.pathLevel = null;
+    this.mode = null;
+this.modeFlags = new Set();
+    this.pathAllowImprov = true;
+    this.pathScriptOnly = false;
+    this.pathEnding = false;
+    this.pathBossAlive = false;
+    this.pathBossKilled = false;
+    this._pathBossSeen = false;
+    this.pathOnTimeGates = 0;
+    this.pathSoftCap = null;
+    this.pathSpawnRampSec = null;
+    this.pathSafeOpeningSec = null;
+    this.pathEnemyUnlockScale = null;
+    this.pathMaxEnemies = null;
+    this.pathScoreMult = 1;
+    this.pathWaveId = null;
+  }
+
+/**
+ * Apply arena topology for Classic (default rect) or Path levels.
+ * @param {{ topology?: string, params?: object } | null | undefined} arenaRef
+ */
+  setArena(arenaRef) {
+    const arena = createArena(arenaRef || { topology: "rect" });
+    this.arena = arena;
+    this.world = { w: arena.worldW, h: arena.worldH };
+    setEntityArena(arena);
+    return arena;
+  }
+
+  /** @returns {import('./modes.js').ModeContext} */
+  _modeContext() {
+    const rules = this.pathLevel?.rules || {};
+    const duration = Number(rules.durationSec);
+    let durationLeft = Infinity;
+    if (Number.isFinite(duration) && duration > 0) {
+      // Deadline counts down; other modes still expose remaining window when set
+      durationLeft = Math.max(0, duration - this.elapsed);
+    }
+    return {
+      game: this,
+      level: this.pathLevel,
+      arena: this.arena || createDefaultArena(),
+      elapsed: this.elapsed,
+      durationLeft,
+      flags: this.modeFlags,
+    };
+  }
+
+  /**
+   * Start an Arena Path level. Accepts LevelDef or level id string.
+   * Does not alter Classic start() endless behavior.
+   * @param {import('./levels.js').LevelDef | string} levelDefOrId
+   */
+  startLevel(levelDefOrId) {
+    const level =
+      typeof levelDefOrId === "string"
+        ? getLevel(levelDefOrId)
+        : levelDefOrId && typeof levelDefOrId === "object"
+          ? levelDefOrId
+          : null;
+    if (!level || !level.id) {
+      console.warn("[arena:path] startLevel: unknown level", levelDefOrId);
+      return false;
+    }
+
+// Shared run reset via classic start, then overlay Path config
+    this.start();
+    this.shell = "path";
+    this.pathLevel = level;
+    this.pathEnding = false;
+    this.modeFlags = new Set();
+
+    const rules = level.rules || {};
+    this.lives = rules.lives != null ? Number(rules.lives) : START_LIVES;
+    this.bombs = rules.bombs != null ? Number(rules.bombs) : START_BOMBS;
+    this.pathSoftCap = rules.softCap != null ? Number(rules.softCap) : null;
+    this.pathSpawnRampSec =
+      rules.spawnRampSec != null ? Number(rules.spawnRampSec) : null;
+    this.pathSafeOpeningSec =
+      rules.safeOpeningSec != null ? Number(rules.safeOpeningSec) : null;
+    this.pathEnemyUnlockScale =
+      rules.enemyUnlockScale != null ? Number(rules.enemyUnlockScale) : null;
+    this.pathMaxEnemies =
+      rules.maxEnemies != null ? Number(rules.maxEnemies) : null;
+    this.pathScoreMult =
+      rules.scoreMult != null && Number(rules.scoreMult) > 0
+        ? Number(rules.scoreMult)
+        : 1;
+
+    this.setArena(level.arena || { topology: "rect" });
+    // Re-center player in playable space after topology change
+    try {
+      const pt = randomPlayablePoint(this.arena, Math.random, this.player.r || 13);
+      if (pt) {
+        this.player.x = pt.x;
+        this.player.y = pt.y;
+      }
+    } catch {
+      /* keep center */
+    }
+    this.mode = createModeController(level.mode);
+    this.ui.updateLives(this.lives);
+    this.ui.updateBombs?.(this.bombs);
+    // Path UI: show order / name instead of Evolved stage counter when available
+    this.ui.updateLevel?.(level.order || 1);
+    this.ui.updatePathLevel?.(level);
+    this.ui.updateObjective?.("");
+    this.ui.updateTimer?.("");
+
+    // BGM: prefer Path theme meta; play classic Neon Swarm fallback until assets land
+    // TODO(audio): audio.playTheme(theme) when path mp3s exist
+    const theme = getLevelTheme(level);
+    const track =
+      theme?.fallback === 2
+        ? 2
+        : theme?.fallback === 1
+          ? 1
+          : level.rules?.bgm === 2
+            ? 2
+            : level.order % 2 === 0
+              ? 2
+              : 1;
+    this.audio.playLevelTheme(track, { restart: true });
+
+    const ctx = this._modeContext();
+    this.mode.onEnter(ctx);
+    this._pushPathHud();
+    return true;
+  }
+
+  /** Alias for path-ui stubs. */
+  startPathLevel(levelDefOrId) {
+    return this.startLevel(levelDefOrId);
+  }
+
+  _pushPathHud() {
+    if (!this.mode || !this.pathLevel) return;
+    const hud = this.mode.getHud(this._modeContext()) || {};
+    if (hud.objective != null) this.ui.updateObjective?.(hud.objective);
+    if (hud.timer != null) this.ui.updateTimer?.(hud.timer);
+    if (hud.label != null) this.ui.updatePathLabel?.(hud.label);
+    if (hud.wave != null) this.ui.updateWave?.(hud.wave);
+  }
+
+  /**
+   * Finish Path run: stars + UI callback. Does not use Classic gameOver chrome
+   * when cleared; lose still avoids Classic high-score panel via onPathResult.
+   * @param {"won"|"lost"} outcome
+   */
+  endPathLevel(outcome = "lost") {
+    if (!this.pathLevel || this.pathEnding) return;
+    this.pathEnding = true;
+
+    const cleared = outcome === "won";
+    const ctx = this._modeContext();
+    const extra = this.mode
+      ? this.mode.buildResult(ctx)
+      : { cleared: false, elapsedSec: this.elapsed };
+    extra.cleared = cleared;
+    if (extra.elapsedSec == null) extra.elapsedSec = this.elapsed;
+    if (extra.peakMult == null) extra.peakMult = this.peakMult;
+    if (extra.livesLeft == null) extra.livesLeft = Math.max(0, this.lives);
+    if (extra.onTimeGates == null && this.pathOnTimeGates != null) {
+      extra.onTimeGates = this.pathOnTimeGates;
+    }
+    extra.mode = this.pathLevel.mode;
+
+    const stars = computeStars(this.pathLevel, this.score, extra);
+    const result = {
+      levelId: this.pathLevel.id,
+      level: this.pathLevel,
+      score: this.score,
+      stars,
+      cleared,
+      outcome,
+      elapsedSec: extra.elapsedSec,
+      peakMult: extra.peakMult,
+      livesLeft: extra.livesLeft,
+      timeLeftSec: extra.timeLeftSec,
+      onTimeGates: extra.onTimeGates,
+      extra,
+    };
+
+    this.state = cleared ? "path_clear" : "path_fail";
+    this.input.exitPointerLock();
+    if (cleared) {
+      this.audio.levelUp?.();
+    } else {
+      this.audio.gameOver?.();
+    }
+
+    // path-ui owns chrome; prefer onPathResult / showPathResult stubs
+    if (typeof this.ui.onPathResult === "function") {
+      this.ui.onPathResult(result);
+    } else if (typeof this.ui.showPathResult === "function") {
+      this.ui.showPathResult(result);
+    } else {
+      // Minimal fallback so runs aren't stuck without path-ui
+      const title = cleared ? "PATH CLEAR" : "PATH FAIL";
+      const body = `${this.pathLevel.name}\nScore ${this.score.toLocaleString()} · ★${stars}`;
+      this.ui.showOverlay?.(title, body, false, "Path", () => this.returnToMenu(), {
+        showTitle: true,
+        onTitle: () => this.returnToMenu(),
+      });
+    }
+
+    console.info("[arena:path-result]", {
+      id: result.levelId,
+      stars,
+      score: result.score,
+      cleared,
+      elapsed: result.elapsedSec,
+    });
+  }
+
+  /** @param {number} dt */
+  _tickPathMode(dt) {
+    if (!this.pathLevel || !this.mode || this.pathEnding) return;
+    if (this.state !== "playing") return;
+    const ctx = this._modeContext();
+    this.mode.onUpdate(ctx, dt);
+    this._pushPathHud();
+    const st = this.mode.getState(ctx);
+    if (st === "won" || st === "lost") {
+      this.endPathLevel(st);
+    }
+  }
+
   pause() {
     if (this.state !== "playing") return;
     this.state = "paused";
@@ -376,6 +650,8 @@ export class Game {
 
   /** Soft exit to live-grid title (from game over Title button). */
   returnToMenu() {
+    this._clearPathRuntime();
+    this.shell = "classic";
     this.state = "menu";
     this.input.exitPointerLock();
     this.input.clearFireButton();
@@ -467,6 +743,11 @@ export class Game {
   }
 
   gameOver() {
+    // Path lives-out / mode lose: Path result UI, not Classic high-score sheet
+    if (this.pathLevel && !this.pathEnding) {
+      this.endPathLevel("lost");
+      return;
+    }
     this.state = "gameover";
     this.input.exitPointerLock();
     this.audio.gameOver();
@@ -527,10 +808,14 @@ export class Game {
    * @param {number} [basePoints] — unmultiplied progress for life/bomb economy
    */
   _addScore(points, x, y, basePoints = null) {
-    this.score += points;
+    let award = points;
+    if (this.pathLevel && this.pathScoreMult && this.pathScoreMult !== 1) {
+      award = Math.floor(points * this.pathScoreMult);
+    }
+    this.score += award;
     this.ui.updateScore(this.score);
     if (x != null) {
-      this.particles.floater(x, y, `+${points}`, COLORS.playerCore);
+      this.particles.floater(x, y, `+${award}`, COLORS.playerCore);
     }
 
     // Milestone economy uses base progress so high mult can't print free lives
@@ -729,15 +1014,26 @@ export class Game {
 
   _difficulty01() {
     // Ease-in curve: stays low early, then ramps (not linear)
-    const t = Math.min(1, this.elapsed / SPAWN_RAMP_SECONDS);
+    const ramp =
+      this.pathLevel && this.pathSpawnRampSec != null && this.pathSpawnRampSec > 0
+        ? this.pathSpawnRampSec
+        : SPAWN_RAMP_SECONDS;
+    const t = Math.min(1, this.elapsed / ramp);
     return t * t;
+  }
+
+  _safeOpeningSec() {
+    if (this.pathLevel && this.pathSafeOpeningSec != null) {
+      return this.pathSafeOpeningSec;
+    }
+    return SAFE_OPENING_SEC;
   }
 
   _spawnInterval() {
     const d = this._difficulty01();
     const base = SPAWN_INTERVAL_START + (SPAWN_INTERVAL_MIN - SPAWN_INTERVAL_START) * d;
     // Levels only matter after the opening; mild extra pressure
-    const levelBoost = this.elapsed < SAFE_OPENING_SEC ? 0 : Math.max(0, this.level - 1) * 0.015;
+    const levelBoost = this.elapsed < this._safeOpeningSec() ? 0 : Math.max(0, this.level - 1) * 0.015;
     return Math.max(SPAWN_INTERVAL_MIN * 0.9, base - levelBoost);
   }
 
@@ -747,8 +1043,17 @@ export class Game {
   }
 
   _softCap() {
+    // Path levels may pin a single soft cap number
+    if (this.pathLevel && this.pathSoftCap != null && this.pathSoftCap > 0) {
+      const cap = this.pathSoftCap;
+      // Still ease in during safe opening so the first seconds aren't max density
+      if (this.elapsed < this._safeOpeningSec()) {
+        return Math.max(SOFT_CAP.opening, Math.min(cap, Math.ceil(cap * 0.45)));
+      }
+      return cap;
+    }
     // Goldilocks density bands — teeth at 90–150s without soup
-    if (this.elapsed < SAFE_OPENING_SEC) return SOFT_CAP.opening;
+    if (this.elapsed < this._safeOpeningSec()) return SOFT_CAP.opening;
     if (this.elapsed < 50) return SOFT_CAP.early;
     if (this.elapsed < 100) return SOFT_CAP.mid;
     if (this.elapsed < 150) return SOFT_CAP.late;
@@ -756,10 +1061,23 @@ export class Game {
   }
 
   _pickType() {
-    if (this.elapsed < SAFE_OPENING_SEC) return "wanderer";
-    let type = pickSpawnType(this.elapsed, SPAWN_TABLE);
+    if (this.elapsed < this._safeOpeningSec()) return "wanderer";
+    // Path: compress SPAWN_TABLE unlocks via enemyUnlockScale (unlockAt * scale)
+    const scale =
+      this.pathLevel && this.pathEnemyUnlockScale != null && this.pathEnemyUnlockScale > 0
+        ? this.pathEnemyUnlockScale
+        : 1;
+    const table =
+      scale === 1
+        ? SPAWN_TABLE
+        : SPAWN_TABLE.map((row) => ({
+            ...row,
+            unlockAt: (row.unlockAt || 0) * scale,
+          }));
+    let type = pickSpawnType(this.elapsed, table);
     const voidCount = this.enemies.filter((e) => e.type === "void").length;
-    const voidUnlock = SPAWN_TABLE.find((t) => t.type === "void")?.unlockAt ?? 105;
+    const voidUnlock =
+      table.find((t) => t.type === "void")?.unlockAt ?? 105 * scale;
     if (type === "void" && (voidCount >= 1 || this.elapsed < voidUnlock)) type = "wanderer";
     if (type === "void" && voidCount >= 2) type = "diamond";
     return type;
@@ -799,12 +1117,26 @@ export class Game {
       }
       const e = spawnEnemy(type, this.elapsed, { x: job.x, y: job.y });
       if (e) {
+        if (job.hp != null && Number(job.hp) > 0) {
+          e.hp = Number(job.hp);
+          e.maxHp = Number(job.hp);
+        }
+        if (job.score != null && Number(job.score) > 0) {
+          e.score = Number(job.score);
+        }
+        if (job.boss) {
+          e.boss = true;
+          e.pathBoss = true;
+          this._pathBossSeen = true;
+          this.pathBossAlive = true;
+        }
+        if (job.pathTag) e.pathTag = job.pathTag;
         if (job.approach) {
           e.approach = job.approach;
           // Hold formation while drifting in (longer early / circle closes)
           const circle = this.phraseTag === "circle";
           e.approachTime =
-            this.elapsed < SAFE_OPENING_SEC
+            this.elapsed < this._safeOpeningSec()
               ? 0.85
               : circle
                 ? 0.55 + Math.random() * 0.15
@@ -855,10 +1187,21 @@ export class Game {
    */
   _trySpawn(dt) {
     const softCap = this._softCap();
+    const maxE =
+      this.pathMaxEnemies != null && this.pathMaxEnemies > 0
+        ? this.pathMaxEnemies
+        : MAX_ENEMIES;
+    const cap = Math.min(softCap, maxE);
 
     // Always drain active formation first
     if (this.spawnQueue.length) {
-      this._drainSpawnQueue(dt, softCap);
+      this._drainSpawnQueue(dt, cap);
+      return;
+    }
+
+    // Path waves / boss-lite: no improvisational phrase director
+    if (this.pathLevel && this.pathScriptOnly && !this.pathAllowImprov) {
+      this.spawnTimer = 999;
       return;
     }
 
@@ -866,31 +1209,34 @@ export class Game {
     if (this.phraseBeats.length) {
       this.spawnTimer -= dt;
       if (this.spawnTimer > 0) return;
-      if (this.enemies.length >= softCap) {
+      if (this.enemies.length >= cap) {
         this.spawnTimer = 0.45;
         return;
       }
-      this._loadNextPhraseBeat(softCap);
+      this._loadNextPhraseBeat(cap);
       return;
     }
 
     this.spawnTimer -= dt;
     if (this.spawnTimer > 0) return;
 
-    if (this.enemies.length >= softCap) {
+    if (this.enemies.length >= cap) {
       this.spawnTimer = 0.55;
       return;
     }
 
     const d = this._difficulty01();
-    const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
-      safeOpening: SAFE_OPENING_SEC,
+const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
+      safeOpening: this._safeOpeningSec(),
       player: this.player,
       seenIntros: this.seenIntros,
       lastCircleAt: this.lastCircleAt,
       lastFloodAt: this.lastFloodAt,
       enemyCount: this.enemies.length,
       hasVoid: this.enemies.some((e) => e.type === "void"),
+      arena: this.arena,
+      worldW: this.world?.w,
+      worldH: this.world?.h,
     });
 
     // Track intros / cooldowns
@@ -932,7 +1278,7 @@ export class Game {
       );
     }
 
-    this._loadNextPhraseBeat(softCap);
+    this._loadNextPhraseBeat(cap);
   }
 
   _dropGeoms(enemy) {
@@ -984,6 +1330,14 @@ export class Game {
     } else if (big) {
       addTrauma(this.cam, 0.15, { big: true });
     }
+
+    if (enemy.pathBoss || enemy.boss) {
+      this.pathBossAlive = false;
+      this.pathBossKilled = true;
+    }
+    if (this.pathLevel && this.mode?.onEnemyKilled) {
+      this.mode.onEnemyKilled(this._modeContext(), enemy);
+    }
   }
 
   _detonateBomb() {
@@ -1003,7 +1357,9 @@ export class Game {
     this.particles.burst(this.player.x, this.player.y, COLORS.bomb, 40, 440);
     this.particles.burst(this.player.x, this.player.y, "#ffffff", 36, 400);
 
+    let bombedBoss = null;
     for (const e of this.enemies) {
+      if (e.pathBoss || e.boss) bombedBoss = e;
       e.dead = true;
       this.particles.burst(e.x, e.y, e.color, 22, 300);
       this.particles.ring(e.x, e.y, e.color, 12, 220);
@@ -1013,8 +1369,22 @@ export class Game {
     this.bullets = [];
     this.player.invuln = Math.max(this.player.invuln, 700);
     this.boardWasPopulated = false; // bomb clear doesn't count as skill clear
-    this.spawnQueue = [];
+    // Keep path-scripted queue; only drop improv residue. Waves/boss re-queue adds.
+    if (!(this.pathLevel && this.pathScriptOnly)) {
+      this.spawnQueue = [];
+    } else {
+      // Drop non-scripted leftover jobs; keep scripted boss/adds if any
+      this.spawnQueue = (this.spawnQueue || []).filter((j) => j.pathScripted || j.boss);
+    }
     this.spawnTimer = Math.max(this.spawnTimer, 0.8);
+
+    if (bombedBoss) {
+      this.pathBossAlive = false;
+      this.pathBossKilled = true;
+      if (this.pathLevel && this.mode?.onEnemyKilled) {
+        this.mode.onEnemyKilled(this._modeContext(), bombedBoss);
+      }
+    }
 
     // Peak strategic fun: bomb protects a high mult — celebrate it
     if (savedMult >= 10) {
@@ -1263,8 +1633,16 @@ export class Game {
     console.info("[arena:death]", deathEvent);
     recordDeath(deathEvent);
 
+    if (this.pathLevel && this.mode?.onPlayerDeath) {
+      this.mode.onPlayerDeath(this._modeContext());
+    }
+
     if (this.lives <= 0) {
-      this.gameOver();
+      if (this.pathLevel) {
+        this.endPathLevel("lost");
+      } else {
+        this.gameOver();
+      }
     }
   }
 
@@ -1323,7 +1701,8 @@ export class Game {
     this.time += dt;
     this.levelTimer += dt;
     if (this.mult > this.peakMult) this.peakMult = this.mult;
-    if (this.levelTimer >= LEVEL_DURATION_SEC) {
+    // Classic Evolved stage/BGM cadence only — Path uses fixed short levels
+    if (!this.pathLevel && this.levelTimer >= LEVEL_DURATION_SEC) {
       this._advanceLevel();
     }
     this._tickMultDecay(dt);
@@ -1494,6 +1873,11 @@ export class Game {
 
     this.particles.update(dt);
     if (this.bombFlash > 0) this.bombFlash = Math.max(0, this.bombFlash - dt * 1.35);
+
+    // Path mode win/lose after sim step (score/enemies settled)
+    if (this.pathLevel && !this.pathEnding) {
+      this._tickPathMode(dt);
+    }
   }
 
   _draw() {
@@ -1522,10 +1906,13 @@ export class Game {
     wctx.fillStyle = "#000005";
     wctx.fillRect(0, 0, bw, bh);
 
-    wctx.save();
+wctx.save();
     applyCameraTransform(wctx, this.cam, dpr);
     // Floor environment first…
-    drawGrid(wctx, 0, 0, this.gridImpulses, this.time);
+    const ww = this.world?.w || WORLD_W;
+    const wh = this.world?.h || WORLD_H;
+    drawGrid(wctx, 0, 0, this.gridImpulses, this.time, ww, wh);
+    if (this.arena) drawArena(wctx, this.arena, { time: this.time, cam: this.cam });
     // …then shadows on the floor…
     drawFloorShadows(wctx, this.player, this.enemies, this.geoms, this.time);
     // …then shapes hovering above
@@ -1584,6 +1971,14 @@ export class Game {
       if (this.input.consumeMute()) this.toggleMute();
       if (this.state === "gameover" && this.input.consumeRestart()) {
         this.start();
+      }
+      if (
+        (this.state === "path_clear" || this.state === "path_fail") &&
+        this.input.consumeRestart() &&
+        this.pathLevel
+      ) {
+        const id = this.pathLevel.id;
+        this.startLevel(id);
       }
       if (this.state === "menu") {
         this.time += dt;

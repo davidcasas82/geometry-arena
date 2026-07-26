@@ -32,6 +32,36 @@ export function clampToWorld(entity, worldW, worldH) {
 }
 
 /**
+ * Keep entity inside an arena (topology-aware).
+ * Falls back to axis-aligned world clamp when arena is missing.
+ * Prefer this over bare clampToWorld when Path topologies are active.
+ *
+ * @param {{ x:number, y:number, r?:number, vx?:number, vy?:number }} entity
+ * @param {{ topology?: string, worldW?: number, worldH?: number, wraps?: boolean }|null|undefined} arena
+ * @param {typeof import('./arenas.js')} [arenasApi] optional arenas module (avoids hard cycle if inlined)
+ */
+export function clampToArena(entity, arena, arenasApi = null) {
+  if (!entity) return;
+  if (arena && arenasApi && typeof arenasApi.clampEntityObject === "function") {
+    arenasApi.clampEntityObject(entity, arena);
+    return;
+  }
+  if (arena && typeof arena.worldW === "number" && typeof arena.worldH === "number") {
+    if (arena.wraps) {
+      const w = arena.worldW;
+      const h = arena.worldH;
+      entity.x = ((entity.x % w) + w) % w;
+      entity.y = ((entity.y % h) + h) % h;
+      return;
+    }
+    clampToWorld(entity, arena.worldW, arena.worldH);
+    return;
+  }
+  // Legacy fallback — callers should pass dims
+  clampToWorld(entity, arena?.worldW ?? 1600, arena?.worldH ?? 900);
+}
+
+/**
  * Soft separation: push `a` away from nearby entities in `list`.
  * Mutates a.x/a.y slightly. Used so enemies don't fully stack.
  */

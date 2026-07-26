@@ -236,7 +236,10 @@ body {
  */
 .overlay > .title-menu,
 .overlay > .interrupt-panel,
-.overlay > .gameover-menu {
+.overlay > .gameover-menu,
+.overlay > .path-map,
+.overlay > .path-brief,
+.overlay > .path-result {
   display: none !important;
   pointer-events: none;
 }
@@ -252,6 +255,13 @@ body {
 }
 
 .overlay.mode-gameover > .gameover-menu:not(.hidden) {
+  display: flex !important;
+  pointer-events: auto;
+}
+
+.overlay.mode-path > .path-map:not(.hidden),
+.overlay.mode-brief > .path-brief:not(.hidden),
+.overlay.mode-path-result > .path-result:not(.hidden) {
   display: flex !important;
   pointer-events: auto;
 }
@@ -278,6 +288,29 @@ body {
     linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, transparent 30%, transparent 68%, rgba(0, 0, 0, 0.7) 100%);
   backdrop-filter: none;
   pointer-events: auto;
+}
+
+/* Path map / brief / result — same live-grid language as title */
+.overlay.mode-path,
+.overlay.mode-brief,
+.overlay.mode-path-result {
+  background:
+    radial-gradient(ellipse 72% 58% at 50% 40%, rgba(6, 4, 22, 0.22), transparent 70%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, transparent 26%, transparent 74%, rgba(0, 0, 0, 0.55) 100%);
+  backdrop-filter: none;
+  pointer-events: auto;
+}
+
+.overlay.mode-path-result {
+  background:
+    radial-gradient(ellipse 75% 60% at 50% 38%, rgba(12, 0, 28, 0.32), transparent 68%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, transparent 28%, transparent 70%, rgba(0, 0, 0, 0.68) 100%);
+}
+
+.overlay.mode-path-result.is-fail {
+  background:
+    radial-gradient(ellipse 75% 60% at 50% 38%, rgba(28, 0, 12, 0.34), transparent 68%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, transparent 28%, transparent 68%, rgba(0, 0, 0, 0.72) 100%);
 }
 
 /* ── Live-grid title menu ── */
@@ -398,8 +431,81 @@ body {
   box-shadow: 0 0 8px rgba(125, 249, 255, 0.15);
 }
 
-.title-best {
+.title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  align-items: stretch;
+  margin-top: 1.35rem;
+  width: 100%;
+}
+
+.title-actions .btn.arcade {
+  margin-top: 0;
+}
+
+/* Secondary arcade sibling — magenta/cyan outline, not primary steal */
+.btn.arcade.path-cta {
+  min-width: 168px;
+  color: #ffe8ff;
+  background: linear-gradient(180deg, rgba(40, 8, 48, 0.92) 0%, rgba(18, 6, 36, 0.96) 100%);
+  border: 3px solid #ff6ad5;
+  border-bottom-width: 5px;
+  border-bottom-color: #3a1060;
+  box-shadow:
+    0 0 0 2px #000,
+    0 6px 0 #0a0820,
+    0 0 26px rgba(255, 80, 200, 0.35),
+    inset 0 0 18px rgba(94, 252, 255, 0.08),
+    inset 0 2px 0 rgba(255, 180, 255, 0.18);
+  text-shadow: 0 0 10px rgba(255, 120, 220, 0.55), 0 1px 0 #000;
+  animation: path-cta-pulse 1.8s ease-in-out infinite;
+}
+
+.btn.arcade.path-cta:hover {
+  filter: brightness(1.1);
+  border-color: #7df9ff;
+  box-shadow:
+    0 0 0 2px #000,
+    0 6px 0 #0a0820,
+    0 0 36px rgba(125, 249, 255, 0.4),
+    0 0 28px rgba(255, 80, 200, 0.35),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+}
+
+@keyframes path-cta-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px #000,
+      0 6px 0 #0a0820,
+      0 0 22px rgba(255, 80, 200, 0.3),
+      inset 0 0 18px rgba(94, 252, 255, 0.06),
+      inset 0 2px 0 rgba(255, 180, 255, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px #000,
+      0 6px 0 #0a0820,
+      0 0 34px rgba(255, 100, 220, 0.55),
+      0 0 18px rgba(94, 252, 255, 0.25),
+      inset 0 2px 0 rgba(255, 200, 255, 0.22);
+  }
+}
+
+.title-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  justify-content: center;
+  align-items: center;
   margin-top: 0.85rem;
+}
+
+.title-best,
+.title-stars {
+  margin: 0;
   font-family: "Press Start 2P", monospace;
   font-size: 0.48rem;
   letter-spacing: 0.14em;
@@ -407,8 +513,18 @@ body {
   text-shadow: 1px 1px 0 #000, 0 0 10px rgba(125, 249, 255, 0.25);
 }
 
-.title-best span {
+.title-best span,
+.title-stars span {
   color: #fff;
+}
+
+.title-stars {
+  color: #d8a0ff;
+  text-shadow: 1px 1px 0 #000, 0 0 10px rgba(200, 100, 255, 0.35);
+}
+
+.title-stars span {
+  color: #ffe566;
 }
 
 .title-help {
@@ -875,6 +991,728 @@ body {
   letter-spacing: 0.14em;
   color: #5e6a88;
   text-shadow: 1px 1px 0 #000;
+}
+
+/* ── Arena Path shell (map / brief / result) ── */
+.path-map,
+.path-brief,
+.path-result {
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  max-width: min(760px, 96vw);
+  width: min(760px, 96vw);
+  max-height: min(92vh, 100%);
+  overflow-x: hidden;
+  overflow-y: auto;
+  text-align: center;
+  padding: 10px 14px 14px;
+  /* Keep neon chrome readable over live grid */
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
+.path-map.entering,
+.path-brief.entering,
+.path-result.entering {
+  animation: title-menu-in 0.55s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+
+.path-kicker {
+  margin: 0;
+  font-family: "Press Start 2P", monospace;
+  font-size: clamp(0.36rem, 1vw, 0.48rem);
+  letter-spacing: 0.28em;
+  color: #ff8ad8;
+  text-shadow: 0 0 10px rgba(255, 80, 180, 0.45), 2px 2px 0 #000;
+}
+
+.path-map-head {
+  width: 100%;
+  margin-bottom: 0.65rem;
+}
+
+.path-map-title {
+  margin: 0.45rem 0 0.35rem;
+  font-family: "Press Start 2P", monospace;
+  font-size: clamp(0.7rem, 2.2vw, 1.05rem);
+  letter-spacing: 0.14em;
+  color: #7df9ff;
+  text-shadow: 0 0 14px rgba(125, 249, 255, 0.5), 2px 2px 0 #000;
+}
+
+.path-map-stars {
+  margin: 0;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.42rem;
+  letter-spacing: 0.16em;
+  color: #d8a0ff;
+  text-shadow: 1px 1px 0 #000, 0 0 10px rgba(200, 100, 255, 0.35);
+}
+
+.path-map-stars span {
+  color: #ffe566;
+}
+
+.path-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 640px;
+}
+
+.path-chapter {
+  position: relative;
+  padding: 12px 10px 14px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 2px solid rgba(94, 252, 255, 0.16);
+  box-shadow: 0 0 0 1px #000, 0 0 22px rgba(80, 120, 255, 0.08);
+  overflow: visible;
+}
+
+.path-chapter-label {
+  margin: 0 0 10px;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.38rem;
+  letter-spacing: 0.18em;
+  color: #8ab4ff;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.path-route,
+.path-nodes {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 2px 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.path-route::before,
+.path-nodes::before {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 24px; /* through diamond centers */
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(125, 249, 255, 0.15) 8%,
+    rgba(255, 100, 200, 0.35) 50%,
+    rgba(125, 249, 255, 0.15) 92%,
+    transparent 100%
+  );
+  box-shadow: 0 0 10px rgba(125, 249, 255, 0.2);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.path-node {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 25%;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 6px 4px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  overflow: visible;
+}
+
+.path-node:focus-visible {
+  outline: 2px solid rgba(125, 249, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.path-node-pip {
+  width: 34px;
+  height: 34px;
+  transform: rotate(45deg);
+  border-radius: 3px;
+  border: 2px solid rgba(94, 252, 255, 0.35);
+  background: rgba(8, 14, 32, 0.85);
+  box-shadow: 0 0 0 1px #000, 0 0 12px rgba(94, 252, 255, 0.15);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease, filter 0.12s ease;
+}
+
+.path-node-pip::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(125, 249, 255, 0.2);
+  border-radius: 1px;
+}
+
+.path-node-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  width: 100%;
+}
+
+.path-node-order {
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.34rem;
+  letter-spacing: 0.08em;
+  color: #6e7a9a;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.path-node-name {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(0.62rem, 1.5vw, 0.82rem);
+  letter-spacing: 0.03em;
+  color: #c8d4f0;
+  /* Allow 2-line names so titles aren't clipped */
+  white-space: normal;
+  overflow: visible;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 1.15;
+  max-width: 100%;
+  min-height: 2.3em;
+  text-shadow: 0 0 8px rgba(125, 249, 255, 0.15);
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.path-node-stars {
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.32rem;
+  letter-spacing: 0.08em;
+  color: #3a4258;
+  min-height: 0.9em;
+}
+
+.path-node.is-unlocked .path-node-pip {
+  border-color: rgba(125, 249, 255, 0.75);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 16px rgba(94, 252, 255, 0.45),
+    inset 0 0 10px rgba(94, 252, 255, 0.12);
+  animation: path-node-pulse 1.7s ease-in-out infinite;
+}
+
+.path-node.is-unlocked .path-node-name {
+  color: #e8f6ff;
+}
+
+.path-node.is-unlocked .path-node-order {
+  color: #7df9ff;
+}
+
+.path-node.is-cleared .path-node-pip {
+  border-color: rgba(255, 214, 80, 0.7);
+  background: linear-gradient(145deg, rgba(40, 24, 8, 0.95), rgba(18, 10, 28, 0.95));
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 18px rgba(255, 200, 80, 0.35),
+    inset 0 0 12px rgba(255, 180, 60, 0.12);
+  animation: none;
+}
+
+.path-node.is-cleared .path-node-stars {
+  color: #ffe566;
+  text-shadow: 0 0 8px rgba(255, 220, 80, 0.45);
+}
+
+.path-node.is-locked {
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: grayscale(0.35);
+}
+
+.path-node.is-locked .path-node-pip {
+  border-color: rgba(80, 90, 120, 0.4);
+  box-shadow: 0 0 0 1px #000;
+  animation: none;
+}
+
+.path-node.is-focused:not(.is-locked) .path-node-pip,
+.path-node:hover:not(.is-locked) .path-node-pip {
+  transform: rotate(45deg) scale(1.12);
+  border-color: #fff;
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 24px rgba(125, 249, 255, 0.65),
+    0 0 18px rgba(255, 80, 200, 0.35);
+}
+
+.path-node.is-focused .path-node-name {
+  color: #fff;
+}
+
+@keyframes path-node-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px #000,
+      0 0 12px rgba(94, 252, 255, 0.35),
+      inset 0 0 8px rgba(94, 252, 255, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px #000,
+      0 0 22px rgba(94, 252, 255, 0.65),
+      inset 0 0 12px rgba(94, 252, 255, 0.18);
+  }
+}
+
+.path-focus {
+  margin-top: 0.9rem;
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 14px 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 100, 180, 0.22);
+  box-shadow: 0 0 0 1px #000, 0 0 20px rgba(125, 249, 255, 0.1);
+  text-align: left;
+}
+
+.path-focus-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.path-focus-order {
+  flex: 0 0 auto;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.72rem;
+  color: #7df9ff;
+  text-shadow: 0 0 10px rgba(125, 249, 255, 0.45), 2px 2px 0 #000;
+  line-height: 1.2;
+  padding-top: 2px;
+}
+
+.path-focus-name {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(1.05rem, 2.6vw, 1.45rem);
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 0 12px rgba(125, 249, 255, 0.25);
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.path-focus-tag {
+  margin: 0.2rem 0 0;
+  font-family: var(--font);
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.path-focus-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.65rem;
+}
+
+.path-badge {
+  display: inline-block;
+  padding: 4px 8px 3px;
+  border-radius: 3px;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.34rem;
+  letter-spacing: 0.1em;
+  border: 1px solid rgba(125, 249, 255, 0.35);
+  color: #9ec8ff;
+  background: rgba(8, 16, 36, 0.75);
+  text-shadow: 1px 1px 0 #000;
+}
+
+.path-badge.mode {
+  border-color: rgba(255, 120, 200, 0.45);
+  color: #ffc0e8;
+}
+
+.path-badge.arena {
+  border-color: rgba(94, 252, 255, 0.4);
+  color: #7df9ff;
+}
+
+.path-badge.lock {
+  border-color: rgba(140, 140, 160, 0.4);
+  color: #9aa0b4;
+}
+
+.path-badge.hidden {
+  display: none;
+}
+
+.path-focus-lesson {
+  margin: 0.65rem 0 0;
+  font-family: var(--font);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: #e8f0ff;
+  font-weight: 600;
+}
+
+.path-focus-best {
+  margin: 0.45rem 0 0;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.36rem;
+  letter-spacing: 0.12em;
+  color: #6e7a9a;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.path-map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1rem;
+  width: 100%;
+}
+
+.path-map-actions .btn.arcade.compact {
+  margin-top: 0;
+  min-width: 160px;
+}
+
+.path-map-hint {
+  margin-top: 0.7rem;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.34rem;
+  letter-spacing: 0.12em;
+  color: #5e6a88;
+  text-shadow: 1px 1px 0 #000;
+}
+
+/* Brief */
+.path-brief {
+  max-width: min(520px, 94vw);
+}
+
+.brief-order {
+  margin: 0.55rem 0 0.35rem;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.42rem;
+  letter-spacing: 0.18em;
+  color: #8ab4ff;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.brief-name {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 900;
+  font-style: italic;
+  font-size: clamp(1.35rem, 4.5vw, 2.2rem);
+  letter-spacing: 0.03em;
+  color: #fff;
+  text-shadow:
+    2px 2px 0 #120820,
+    0 0 22px rgba(125, 249, 255, 0.35);
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.1;
+  max-width: 100%;
+  padding: 0 4px;
+  word-break: break-word;
+}
+
+.brief-tag {
+  margin: 0.35rem 0 0;
+  font-family: var(--font);
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.brief-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 0.85rem;
+}
+
+.brief-objective {
+  white-space: normal;
+  line-height: 1.35;
+  max-width: 100%;
+  overflow: visible;
+  word-break: break-word;
+  margin: 1rem 0 0;
+  padding: 10px 14px;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 4px;
+  font-family: "Press Start 2P", monospace;
+  font-size: clamp(0.42rem, 1.3vw, 0.58rem);
+  letter-spacing: 0.14em;
+  color: #7df9ff;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(94, 252, 255, 0.3);
+  box-shadow: 0 0 0 1px #000, 0 0 18px rgba(94, 252, 255, 0.15);
+  text-shadow: 0 0 10px rgba(125, 249, 255, 0.4), 1px 1px 0 #000;
+}
+
+.brief-lesson {
+  margin: 0.85rem 0 0;
+  max-width: 420px;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #c0cae0;
+}
+
+.brief-actions {
+  margin-top: 1.15rem;
+}
+
+/* Path result */
+.path-result-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.9;
+  filter: drop-shadow(0 0 22px rgba(125, 249, 255, 0.3));
+}
+
+.path-result-word {
+  display: block;
+  font-family: var(--display);
+  font-weight: 900;
+  font-style: italic;
+  font-size: clamp(2.2rem, 10vw, 4.2rem);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.35);
+}
+
+.path-result-fill {
+  display: inline-block;
+  position: relative;
+  text-shadow:
+    1px 1px 0 #1a0a30,
+    2px 2px 0 #120820,
+    3px 3px 0 #0a0414,
+    4px 5px 0 rgba(0, 0, 0, 0.55),
+    0 0 28px rgba(125, 249, 255, 0.35);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background-image: linear-gradient(
+    180deg,
+    #f0ffff 0%,
+    #7df9ff 16%,
+    #4a7cff 48%,
+    #b04aff 82%,
+    #ff4ac8 100%
+  );
+}
+
+.path-result.is-fail .path-result-fill {
+  background-image: linear-gradient(
+    180deg,
+    #fff0f5 0%,
+    #ff8ab8 18%,
+    #ff2d6a 48%,
+    #c020ff 82%,
+    #6a20ff 100%
+  );
+  text-shadow:
+    1px 1px 0 #1a0a30,
+    2px 2px 0 #120820,
+    3px 3px 0 #0a0414,
+    4px 5px 0 rgba(0, 0, 0, 0.55),
+    0 0 28px rgba(255, 80, 140, 0.4);
+}
+
+.path-result-tag {
+  margin-top: 0.65rem;
+  font-family: "Press Start 2P", monospace;
+  font-size: clamp(0.38rem, 1.1vw, 0.5rem);
+  letter-spacing: 0.22em;
+  color: #8ab4ff;
+  text-shadow: 0 0 10px rgba(94, 252, 255, 0.4), 2px 2px 0 #000;
+}
+
+.path-result-stars {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 1rem;
+}
+
+.star-pip {
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  line-height: 1;
+  color: #2a3048;
+  text-shadow: 1px 1px 0 #000;
+  transition: color 0.2s ease, text-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.star-pip.on {
+  color: #ffe566;
+  text-shadow:
+    0 0 12px rgba(255, 220, 80, 0.7),
+    0 0 24px rgba(255, 160, 40, 0.35),
+    2px 2px 0 #000;
+  transform: scale(1.08);
+  animation: star-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.star-pip.on:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.star-pip.on:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+@keyframes star-pop {
+  from {
+    opacity: 0.2;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+.path-result-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 1.15rem;
+  width: 100%;
+  max-width: 560px;
+}
+
+.path-result-meta {
+  margin-top: 0.75rem;
+  font-family: "Press Start 2P", monospace;
+  font-size: 0.38rem;
+  letter-spacing: 0.14em;
+  color: #8ab4ff;
+  text-shadow: 1px 1px 0 #000;
+  min-height: 1.2em;
+}
+
+.path-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1.2rem;
+  width: 100%;
+}
+
+.path-result-actions .btn.arcade {
+  margin-top: 0;
+  min-width: min(220px, 70vw);
+  animation: arcade-pulse 1.6s ease-in-out infinite;
+}
+
+.path-result-actions .btn.secondary {
+  min-width: 120px;
+}
+
+/* In-run Path objective chip */
+.stat.path-obj-stat {
+  border-color: rgba(255, 120, 200, 0.35);
+  min-width: 110px;
+}
+
+.stat.path-obj-stat .stat-value,
+.path-obj-value {
+  color: #ffc0e8;
+  font-size: clamp(0.72rem, 1.5vw, 0.95rem);
+  letter-spacing: 0.02em;
+}
+
+.stat.path-obj-stat.hidden {
+  display: none;
+}
+
+body.path-run #level-label {
+  color: #ff8ad8;
+}
+
+body.touch-ui .path-result-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 340px;
+}
+
+body.touch-ui .path-node-name {
+  font-size: 0.62rem;
+}
+
+body.touch-ui .path-node-pip {
+  width: 28px;
+  height: 28px;
+}
+
+body.touch-ui .title-actions .btn.arcade {
+  min-width: min(150px, 42vw);
+}
+
+@media (max-width: 700px) {
+  .path-node-name {
+    font-size: 0.58rem;
+  }
+
+  .path-focus {
+    padding: 10px;
+  }
+
+  .path-result-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 480px) {
+  .path-map-hint,
+  .path-brief .path-map-hint,
+  .path-result .path-map-hint {
+    display: none;
+  }
+
+  .path-focus-lesson {
+    display: none;
+  }
+
+  .path-node-name {
+    display: none;
+  }
+
+  .path-chapters {
+    gap: 8px;
+  }
 }
 
 body.touch-ui .gameover-game {

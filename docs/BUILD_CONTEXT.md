@@ -2,7 +2,7 @@
 
 **Purpose:** handoff doc so a new session (human or agent) can resume development without re-discovering architecture, product decisions, and past failure modes.
 
-**Last updated:** 2026-07-25 (phrase wave director)  
+**Last updated:** 2026-07-26 (Arena Path levels MVP + topologies)  
 **Project root:** `geometry-arena/` (under `My Dev Folder`)  
 **Stack:** vanilla HTML / CSS / ES modules, Canvas 2D, Web Audio SFX + HTMLAudio BGM, `localStorage` only (no backend)
 
@@ -84,10 +84,14 @@ geometry-arena/
     BUILD_CONTEXT.md  # this file
     GAMEPLAY_TUNING_RESEARCH.md
     VS_GEOMETRY_WARS.md
-  js/
-    main.js           # UI wiring, splash → title menu, overlays
-    game.js           # loop, state machine, scoring, spawn/death/bomb
+js/
+    main.js           # UI wiring, splash → title/Path map, overlays
+    game.js           # loop, state machine, Classic + Path startLevel
     constants.js      # goldilocks balance (prefer edit here)
+    levels.js         # Path catalog, stars, themes, unlock helpers
+    modes.js          # Path mode controllers (deadline/waves/…)
+    arenas.js         # topology collision + draw (rect/donut/…)
+    progress.js       # Path stars localStorage
     input.js          # keys, mouse aim, gamepad (sticks/buttons), pointer lock
     entities.js       # player / bullets / enemies / geoms factories
     physics.js        # movement, collisions helpers
@@ -112,9 +116,19 @@ geometry-arena/
 | State | Meaning |
 |-------|---------|
 | `menu` | Living arena ambient; title UI over grid |
-| `playing` | Active run |
+| `playing` | Active run (Classic or Path) |
 | `paused` | Interrupt panel |
-| `gameover` | Interrupt panel + run summary |
+| `gameover` | Classic run summary |
+| `path_clear` / `path_fail` | Path level ended (UI via `onPathResult`) |
+
+### Shells
+
+| Shell | Entry | Notes |
+|-------|-------|--------|
+| **Classic** | Title **PLAY** → `game.start()` | Endless Evolved; never star-gated |
+| **Arena Path** | Title **PATH** → map → brief → `game.startLevel(id)` | 8 authored levels, stars, topologies |
+
+Path catalog/contracts: `docs/LEVELS_DESIGN.md`, `js/levels.js`, `js/modes.js`, `js/arenas.js`, `js/progress.js`. Bespoke BGM themes via `PATH_THEMES` / `rules.themeId` (MP3s optional; Neon Swarm fallback).
 
 Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu still draws ambient grid pulses / particles / menu camera.
 

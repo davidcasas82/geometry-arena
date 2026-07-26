@@ -1,5 +1,7 @@
 import {
   COLORS,
+  GEOM_FADE_SEC,
+  GEOM_LIFE,
   GRID_STEP,
   HOVER_HEIGHT,
   SHADOW_OX,
@@ -14,36 +16,38 @@ import { bloom, colorWithAlpha, neonFillStroke, neonStroke } from "./fx.js";
  * Floor environment: deep void + grounded neon grid plane.
  * Shapes are drawn later with shadows so they read as hovering above this floor.
  */
-export function drawGrid(ctx, shakeX = 0, shakeY = 0, impulses = [], t = 0) {
+export function drawGrid(ctx, shakeX = 0, shakeY = 0, impulses = [], t = 0, worldW = WORLD_W, worldH = WORLD_H) {
+  const W = worldW || WORLD_W;
+  const H = worldH || WORLD_H;
   ctx.save();
   ctx.translate(shakeX, shakeY);
 
   // Deep void under the arena
   ctx.fillStyle = COLORS.bgDeep;
-  ctx.fillRect(-8, -8, WORLD_W + 16, WORLD_H + 16);
+  ctx.fillRect(-8, -8, W + 16, H + 16);
 
   // Floor plate — slightly lifted panels of dark navy so the grid feels like a surface
-  const floor = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+  const floor = ctx.createLinearGradient(0, 0, 0, H);
   floor.addColorStop(0, "rgba(6, 10, 28, 0.95)");
   floor.addColorStop(0.45, "rgba(4, 8, 22, 0.98)");
   floor.addColorStop(1, "rgba(2, 4, 14, 1)");
   ctx.fillStyle = floor;
-  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+  ctx.fillRect(0, 0, W, H);
 
   // Soft “stage” light on the floor center
   const vg = ctx.createRadialGradient(
-    WORLD_W / 2,
-    WORLD_H / 2,
+    W / 2,
+    H / 2,
     60,
-    WORLD_W / 2,
-    WORLD_H / 2,
-    WORLD_W * 0.7
+    W / 2,
+    H / 2,
+    W * 0.7
   );
   vg.addColorStop(0, "rgba(30, 70, 140, 0.2)");
   vg.addColorStop(0.5, "rgba(12, 24, 55, 0.1)");
   vg.addColorStop(1, "rgba(0, 0, 0, 0.35)");
   ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+  ctx.fillRect(0, 0, W, H);
 
   const step = GRID_STEP;
 
@@ -80,18 +84,18 @@ export function drawGrid(ctx, shakeX = 0, shakeY = 0, impulses = [], t = 0) {
   ctx.lineWidth = 1;
   ctx.strokeStyle = "rgba(20, 60, 120, 0.5)";
   ctx.translate(2, 3);
-  for (let x = 0; x <= WORLD_W; x += step * 2) {
+  for (let x = 0; x <= W; x += step * 2) {
     ctx.beginPath();
-    for (let y = 0; y <= WORLD_H; y += step) {
+    for (let y = 0; y <= H; y += step) {
       const p = warp(x, y);
       if (y === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
     }
     ctx.stroke();
   }
-  for (let y = 0; y <= WORLD_H; y += step * 2) {
+  for (let y = 0; y <= H; y += step * 2) {
     ctx.beginPath();
-    for (let x = 0; x <= WORLD_W; x += step) {
+    for (let x = 0; x <= W; x += step) {
       const p = warp(x, y);
       if (x === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
@@ -103,18 +107,18 @@ export function drawGrid(ctx, shakeX = 0, shakeY = 0, impulses = [], t = 0) {
   // Primary floor grid
   ctx.lineWidth = 1;
   ctx.strokeStyle = COLORS.grid;
-  for (let x = 0; x <= WORLD_W; x += step) {
+  for (let x = 0; x <= W; x += step) {
     ctx.beginPath();
-    for (let y = 0; y <= WORLD_H; y += step) {
+    for (let y = 0; y <= H; y += step) {
       const p = warp(x, y);
       if (y === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
     }
     ctx.stroke();
   }
-  for (let y = 0; y <= WORLD_H; y += step) {
+  for (let y = 0; y <= H; y += step) {
     ctx.beginPath();
-    for (let x = 0; x <= WORLD_W; x += step) {
+    for (let x = 0; x <= W; x += step) {
       const p = warp(x, y);
       if (x === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
@@ -127,18 +131,18 @@ export function drawGrid(ctx, shakeX = 0, shakeY = 0, impulses = [], t = 0) {
   ctx.globalCompositeOperation = "lighter";
   ctx.strokeStyle = COLORS.gridMajor;
   ctx.lineWidth = 1.6;
-  for (let x = 0; x <= WORLD_W; x += step * 5) {
+  for (let x = 0; x <= W; x += step * 5) {
     ctx.beginPath();
-    for (let y = 0; y <= WORLD_H; y += step) {
+    for (let y = 0; y <= H; y += step) {
       const p = warp(x, y);
       if (y === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
     }
     ctx.stroke();
   }
-  for (let y = 0; y <= WORLD_H; y += step * 5) {
+  for (let y = 0; y <= H; y += step * 5) {
     ctx.beginPath();
-    for (let x = 0; x <= WORLD_W; x += step) {
+    for (let x = 0; x <= W; x += step) {
       const p = warp(x, y);
       if (x === 0) ctx.moveTo(p.x, p.y);
       else ctx.lineTo(p.x, p.y);
@@ -152,22 +156,22 @@ export function drawGrid(ctx, shakeX = 0, shakeY = 0, impulses = [], t = 0) {
   ctx.globalCompositeOperation = "lighter";
   ctx.strokeStyle = "rgba(40, 100, 180, 0.35)";
   ctx.lineWidth = 10;
-  ctx.strokeRect(4, 4, WORLD_W - 8, WORLD_H - 8);
+  ctx.strokeRect(4, 4, W - 8, H - 8);
   ctx.strokeStyle = "rgba(80, 200, 255, 0.3)";
   ctx.lineWidth = 5;
-  ctx.strokeRect(2, 2, WORLD_W - 4, WORLD_H - 4);
+  ctx.strokeRect(2, 2, W - 4, H - 4);
   ctx.strokeStyle = "rgba(160, 240, 255, 0.65)";
   ctx.lineWidth = 1.5;
-  ctx.strokeRect(1, 1, WORLD_W - 2, WORLD_H - 2);
+  ctx.strokeRect(1, 1, W - 2, H - 2);
   ctx.restore();
 
   // Thin atmospheric haze above the floor (separates air from ground)
-  const haze = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+  const haze = ctx.createLinearGradient(0, 0, 0, H);
   haze.addColorStop(0, "rgba(0, 0, 0, 0.12)");
   haze.addColorStop(0.5, "rgba(0, 20, 50, 0.04)");
   haze.addColorStop(1, "rgba(0, 0, 0, 0.18)");
   ctx.fillStyle = haze;
-  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+  ctx.fillRect(0, 0, W, H);
 
   ctx.restore();
 }
@@ -382,15 +386,30 @@ export function drawBullets(ctx, bullets) {
 
 export function drawGeoms(ctx, geoms, t = 0) {
   // Small sparkle pickups — deliberately not enemy-shaped (no big diamonds)
+  // Fade/blink when about to expire so players feel the urgency to scoop.
   for (const g of geoms) {
+const maxL = g.maxLife > 0 ? g.maxLife : GEOM_LIFE;
+    const lifeFrac = Math.max(0, Math.min(1, g.life / maxL));
+    // Last GEOM_FADE_SEC: drop alpha + blink hard
+    let alpha = 1;
+    if (g.life < GEOM_FADE_SEC) {
+      const u = Math.max(0, g.life / GEOM_FADE_SEC);
+      const blink = Math.floor(t * (10 + (1 - u) * 18)) % 2 === 0 ? 1 : 0.28;
+      alpha = (0.25 + 0.75 * u) * blink;
+    } else if (lifeFrac < 0.45) {
+      alpha = 0.55 + 0.45 * ((lifeFrac - 0.2) / 0.25);
+      alpha = Math.max(0.55, Math.min(1, alpha));
+    }
+
     const pulse = 0.85 + 0.15 * Math.sin(t * 10 + g.x * 0.12);
     const bob = Math.sin(t * 6 + g.y * 0.08) * 1.1;
     const s = Math.max(2.2, g.r * pulse);
     ctx.save();
+    ctx.globalAlpha = alpha;
     ctx.translate(g.x, hoverY(g.y, bob));
 
     // Soft lime glow (compact)
-    bloom(ctx, 0, 0, s * 2.8, COLORS.geom, 0.35);
+    bloom(ctx, 0, 0, s * 2.8, COLORS.geom, 0.35 * alpha);
 
     // Core dot
     ctx.beginPath();

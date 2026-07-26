@@ -61,9 +61,13 @@
           <span class="stat-label">Score</span>
           <span id="score" class="stat-value">0</span>
         </div>
-        <div class="stat">
-          <span class="stat-label">Level</span>
+        <div class="stat" id="level-stat">
+          <span class="stat-label" id="level-label">Level</span>
           <span id="level" class="stat-value">1</span>
+        </div>
+        <div class="stat path-obj-stat hidden" id="path-obj-stat">
+          <span class="stat-label">Obj</span>
+          <span id="path-objective" class="stat-value path-obj-value">—</span>
         </div>
         <div class="stat accent">
           <span class="stat-label">Mult</span>
@@ -113,8 +117,14 @@
           </div>
           <p class="title-tag">TWIN-STICK · NEON SWARM</p>
 
-          <button id="start-btn" class="btn arcade" type="button">PLAY</button>
-          <p class="title-best">BEST <span id="title-best">0</span></p>
+          <div class="title-actions">
+            <button id="start-btn" class="btn arcade" type="button">PLAY</button>
+            <button id="path-btn" class="btn arcade path-cta" type="button">PATH</button>
+          </div>
+          <div class="title-meta-row">
+            <p class="title-best">BEST <span id="title-best">0</span></p>
+            <p class="title-stars" id="title-stars" title="Arena Path stars">STARS <span id="title-stars-count">0/24</span></p>
+          </div>
           <button id="help-btn" class="title-help" type="button">HOW TO PLAY</button>
 
           <ul id="how-to" class="how-to title-howto hidden">
@@ -148,6 +158,102 @@
             <li><kbd>Space</kbd> / A bomb clears (no points) · death soft-resets mult</li>
             <li>Extra life · bomb milestones · <kbd>P</kbd> / Start pause</li>
           </ul>
+        </div>
+
+        <!-- Arena Path map (live-grid overlay) -->
+        <div id="path-map" class="path-map hidden" role="dialog" aria-label="Arena Path">
+          <header class="path-map-head">
+            <p class="path-kicker">ARENA PATH</p>
+            <h2 class="path-map-title">SELECT LEVEL</h2>
+            <p class="path-map-stars">STARS <span id="path-map-stars">0/24</span></p>
+          </header>
+
+          <div id="path-chapters" class="path-chapters" aria-label="Path chapters"></div>
+
+          <div id="path-focus" class="path-focus" aria-live="polite">
+            <div class="path-focus-top">
+              <span id="path-focus-order" class="path-focus-order">01</span>
+              <div class="path-focus-copy">
+                <h3 id="path-focus-name" class="path-focus-name">Grid Wake</h3>
+                <p id="path-focus-tag" class="path-focus-tag">Learn the neon floor.</p>
+              </div>
+            </div>
+            <div class="path-focus-badges">
+              <span id="path-focus-mode" class="path-badge mode">EVOLVED</span>
+              <span id="path-focus-arena" class="path-badge arena">RECT</span>
+              <span id="path-focus-lock" class="path-badge lock hidden">LOCKED</span>
+            </div>
+            <p id="path-focus-lesson" class="path-focus-lesson"></p>
+            <p id="path-focus-best" class="path-focus-best">BEST — · ★★★</p>
+          </div>
+
+          <div class="path-map-actions">
+            <button id="path-select-btn" class="btn arcade compact" type="button">SELECT</button>
+            <button id="path-back-btn" class="btn secondary compact" type="button">TITLE</button>
+          </div>
+          <p class="path-map-hint">← → · ENTER SELECT · ESC TITLE</p>
+        </div>
+
+        <!-- Level brief before Path start -->
+        <div id="path-brief" class="path-brief hidden" role="dialog" aria-label="Level brief">
+          <p class="path-kicker">LEVEL BRIEF</p>
+          <p id="brief-order" class="brief-order">1 / 8</p>
+          <h2 id="brief-name" class="brief-name">Grid Wake</h2>
+          <p id="brief-tag" class="brief-tag">Learn the neon floor.</p>
+          <div class="brief-badges">
+            <span id="brief-mode" class="path-badge mode">EVOLVED</span>
+            <span id="brief-arena" class="path-badge arena">RECT</span>
+          </div>
+          <p id="brief-objective" class="brief-objective">SURVIVE 60S</p>
+          <p id="brief-lesson" class="brief-lesson">Strafe, scoop geoms, trust the needle gun.</p>
+          <div class="path-map-actions brief-actions">
+            <button id="brief-start-btn" class="btn arcade compact" type="button">START</button>
+            <button id="brief-back-btn" class="btn secondary compact" type="button">BACK</button>
+          </div>
+          <p class="path-map-hint">ENTER START · ESC BACK</p>
+        </div>
+
+        <!-- Path clear / fail result -->
+        <div id="path-result" class="path-result hidden" role="dialog" aria-label="Path result">
+          <div class="path-result-logo" aria-hidden="true">
+            <span id="path-result-word" class="path-result-word"><span class="path-result-fill">CLEAR</span></span>
+          </div>
+          <p id="path-result-tag" class="path-result-tag">GRID WAKE</p>
+
+          <div id="path-result-stars" class="path-result-stars" aria-label="Stars earned">
+            <span class="star-pip" data-i="1">★</span>
+            <span class="star-pip" data-i="2">★</span>
+            <span class="star-pip" data-i="3">★</span>
+          </div>
+
+          <div class="path-result-stats" aria-live="polite">
+            <div class="go-stat">
+              <span class="go-label">SCORE</span>
+              <span id="pr-score" class="go-value">0</span>
+            </div>
+            <div class="go-stat accent">
+              <span class="go-label">STARS</span>
+              <span id="pr-stars" class="go-value">0</span>
+            </div>
+            <div class="go-stat">
+              <span class="go-label">BEST</span>
+              <span id="pr-best" class="go-value">0</span>
+            </div>
+            <div class="go-stat">
+              <span class="go-label">TIME</span>
+              <span id="pr-time" class="go-value">0s</span>
+            </div>
+          </div>
+
+          <p id="path-result-meta" class="path-result-meta"></p>
+
+          <div class="path-result-actions">
+            <button id="pr-primary-btn" class="btn arcade" type="button">NEXT</button>
+            <button id="pr-retry-btn" class="btn secondary" type="button">RETRY</button>
+            <button id="pr-map-btn" class="btn secondary" type="button">PATH MAP</button>
+            <button id="pr-title-btn" class="btn secondary go-title-btn" type="button">TITLE</button>
+          </div>
+          <p class="path-map-hint">R RETRY · ENTER PRIMARY · ESC MAP</p>
         </div>
 
         <!-- Classic chrome GAME OVER (no boilerplate box) -->
