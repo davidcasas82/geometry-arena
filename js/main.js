@@ -451,11 +451,13 @@ const row = document.createElement("div");
       btn.classList.toggle("is-focused", level.id === pathFocusId);
       btn.setAttribute("aria-label", `${level.name}${unlocked ? "" : " locked"}`);
       btn.innerHTML = `
-        <span class="path-node-pip" aria-hidden="true"></span>
+        <span class="path-node-pip-wrap" aria-hidden="true">
+          <span class="path-node-pip"></span>
+        </span>
         <span class="path-node-meta">
           <span class="path-node-order">${String(level.order).padStart(2, "0")}</span>
           <span class="path-node-name">${level.name}</span>
-          <span class="path-node-stars">${starGlyphs(stars)}</span>
+          <span class="path-node-stars" aria-label="${stars} of 3 stars">${starGlyphs(stars)}</span>
         </span>`;
       btn.addEventListener("click", () => {
         pathFocusId = level.id;
