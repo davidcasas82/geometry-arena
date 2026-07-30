@@ -1,4 +1,5 @@
 import { Game } from "./game.js";
+import { applyGfxQuality, GFX, resolveGfxQuality } from "./constants.js";
 import { dumpRunsToConsole, getRecentRuns } from "./runs.js";
 import {
   CHAPTER_TITLES,
@@ -148,7 +149,10 @@ function syncTouchChrome() {
     want && window.matchMedia("(orientation: portrait)").matches;
   portraitHint?.classList.toggle("hidden", !portrait);
 
-  // Refit canvas when chrome density changes
+  // Keep mobile graphics tier + canvas DPR in sync with chrome/device
+  applyGfxQuality(resolveGfxQuality());
+  document.body.classList.toggle("gfx-low", GFX.QUALITY === "low");
+  document.body.classList.toggle("gfx-high", GFX.QUALITY !== "low");
   game?.fitCanvas?.();
 }
 
@@ -920,6 +924,8 @@ window.__geometryArena = game;
 window.__arenaRuns = () => dumpRunsToConsole();
 window.__arenaRecent = () => getRecentRuns(10);
 window.__arenaPath = () => exportProgressDebug();
+/** Force presentation tier: setGfxQuality('low'|'high') or null to clear override. */
+window.setGfxQuality = (tier) => game.setGfxQuality(tier === "auto" ? null : tier);
 refreshTitleStars();
 
 // Virtual sticks + bomb/pause (no-ops on desktop mouse)

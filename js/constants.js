@@ -78,7 +78,7 @@ export const TOUCH_STICK_RADIUS = 54;
 /** Same deadzone ratio as gamepad for thumb sticks. */
 export const TOUCH_DEADZONE = 0.16;
 /** Cap DPR on coarse/touch devices for battery + heat. */
-export const TOUCH_MAX_DPR = 1.5;
+export const TOUCH_MAX_DPR = 1.25;
 
 // ── Dial B: Density (ease-in toward ~2–3 min intensity) ──
 export const MAX_ENEMIES = 55;
@@ -173,13 +173,114 @@ export const SHADOW_OX = 5;
 export const SHADOW_OY = 11;
 
 /**
+ * Presentation quality tiers.
+ * `high` — full desktop neon pipeline (offscreen world + bloom + CA).
+ * `low`  — mobile/iPad path: draw straight to the visible canvas, no heavy post.
+ *
+ * Console override:
+ *   setGfxQuality('low' | 'high')
+ *   GFX.QUALITY_FORCE = 'low' // sticky until cleared
+ */
+export const GFX_QUALITY_PRESETS = {
+  high: {
+    id: "high",
+    maxDpr: 2,
+    touchMaxDpr: 1.5,
+    bloom: true,
+    chromatic: true,
+    colorGrade: true,
+    vignette: true,
+    /** Offscreen world buffer required for bloom / chromatic passes */
+    offscreenWorld: true,
+  },
+  low: {
+    id: "low",
+    maxDpr: 1.25,
+    touchMaxDpr: 1.25,
+    bloom: false,
+    chromatic: false,
+    // Cheap full-frame fills — keep a bit of mult heat without blur filters
+    colorGrade: true,
+    vignette: true,
+    offscreenWorld: false,
+  },
+};
+
+/**
+ * Phones / tablets where Canvas2D blur post-FX tanks the frame budget.
+ * Mirrors main.js touch chrome heuristics (coarse pointer or narrow + touch).
+ */
+export function preferMobileGraphics() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const touchPoints = navigator.maxTouchPoints || 0;
+  if (touchPoints <= 0) return false;
+  try {
+    const coarse = window.matchMedia?.("(pointer: coarse)")?.matches;
+    const narrow = window.matchMedia?.("(max-width: 900px)")?.matches;
+    if (coarse || narrow) return true;
+  } catch {
+    /* ignore matchMedia failures */
+  }
+  // iPadOS desktop-class UA still reports touch points; treat as mobile GPU path
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/i.test(ua)) return true;
+  if (navigator.platform === "MacIntel" && touchPoints > 1) return true;
+  return false;
+}
+
+/** Resolve active tier id from force override or device heuristics. */
+export function resolveGfxQuality() {
+  const force = GFX.QUALITY_FORCE;
+  if (force === "high" || force === "low") return force;
+  return preferMobileGraphics() ? "low" : "high";
+}
+
+/**
+ * Apply a quality preset onto the live GFX flags used by the render path.
+ * @param {"high"|"low"} [tier]
+ * @returns {"high"|"low"}
+ */
+export function applyGfxQuality(tier) {
+  const id = tier === "low" || tier === "high" ? tier : resolveGfxQuality();
+  const preset = GFX_QUALITY_PRESETS[id] || GFX_QUALITY_PRESETS.high;
+  GFX.QUALITY = preset.id;
+  GFX.MAX_DPR = preset.maxDpr;
+  GFX.TOUCH_MAX_DPR = preset.touchMaxDpr;
+  GFX.ENABLE_BLOOM = !!preset.bloom;
+  GFX.ENABLE_CHROMATIC = !!preset.chromatic;
+  GFX.ENABLE_COLOR_GRADE = !!preset.colorGrade;
+  GFX.ENABLE_VIGNETTE = !!preset.vignette;
+  GFX.USE_OFFSCREEN_WORLD = !!preset.offscreenWorld;
+  return preset.id;
+}
+
+/**
  * Post-process / presentation pipeline.
  * Sektori-leaning: hotter multi-hue grade, stronger neon bloom, techno breath,
  * front-loaded debris. REDUCED_FLASH softens CA / bomb strobe / underlay pulse.
+ *
+ * Runtime quality flags (ENABLE_*) are owned by applyGfxQuality — do not hand-edit
+ * those unless you also set QUALITY_FORCE.
  */
 export const GFX = {
+  /** Active tier id after applyGfxQuality() */
+  QUALITY: "high",
+  /**
+   * Sticky override: 'high' | 'low' | null.
+   * Console: GFX.QUALITY_FORCE = 'low'; applyGfxQuality(); __geometryArena.fitCanvas()
+   */
+  QUALITY_FORCE: null,
   /** Cap devicePixelRatio so 3× displays don’t melt GPUs */
   MAX_DPR: 2,
+  /** Extra cap while touch chrome is active (phones / tablets) */
+  TOUCH_MAX_DPR: 1.25,
+  /** Heavy post passes — disabled on the mobile quality path */
+  ENABLE_BLOOM: true,
+  ENABLE_CHROMATIC: true,
+  ENABLE_COLOR_GRADE: true,
+  ENABLE_VIGNETTE: true,
+  /** When false, world draws straight to the visible canvas (no blit / bloom buffers) */
+  USE_OFFSCREEN_WORLD: true,
   /** Bloom buffer scale vs world (lower = cheaper, softer) */
   BLOOM_RES: 0.42,
   /** CSS filter blur radius in bloom-buffer pixels */
@@ -235,6 +336,9 @@ export const GFX = {
   KILL_STREAK_LIFE: 0.26,
   KILL_SOFT_LIFE: 0.32,
 };
+
+// Default tier for the current environment (no-ops headless UAT without window).
+applyGfxQuality(resolveGfxQuality());
 
 /**
  * Classic arena morph (Sektori-style spatial pressure).

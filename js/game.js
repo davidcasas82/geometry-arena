@@ -20,7 +20,8 @@ import {
   GEOM_MULT,
   GEOM_VACUUM_MILESTONES,
   GFX,
-  TOUCH_MAX_DPR,
+  applyGfxQuality,
+  resolveGfxQuality,
   GRID_IMPULSE_MAX,
   HS_KEY,
   INVULN_MS,
@@ -240,16 +241,34 @@ export class Game {
 
   _initPresentationBuffers() {
     if (typeof document === "undefined" || !document.createElement) return;
-    this.worldCanvas = document.createElement("canvas");
-    this.worldCtx =
-      this.worldCanvas.getContext("2d", { alpha: false }) ||
-      this.worldCanvas.getContext("2d");
-    this.bloomTight = document.createElement("canvas");
-    this.bloomWide = document.createElement("canvas");
+    if (!this.worldCanvas) {
+      this.worldCanvas = document.createElement("canvas");
+      this.worldCtx =
+        this.worldCanvas.getContext("2d", { alpha: false }) ||
+        this.worldCanvas.getContext("2d");
+    }
+    if (!this.bloomTight) this.bloomTight = document.createElement("canvas");
+    if (!this.bloomWide) this.bloomWide = document.createElement("canvas");
+  }
+
+  /**
+   * Re-resolve presentation quality (mobile low / desktop high) and refit buffers.
+   * Safe to call on resize, orientation change, or console override.
+   * @param {"high"|"low"} [tier] optional forced tier for this call only
+   */
+  setGfxQuality(tier) {
+    if (tier === "high" || tier === "low") GFX.QUALITY_FORCE = tier;
+    else GFX.QUALITY_FORCE = null; // auto / undefined clears sticky override
+    this.fitCanvas();
+    return GFX.QUALITY;
   }
 
   fitCanvas() {
-    if (!this.worldCanvas) this._initPresentationBuffers();
+    // Keep quality flags in sync with device / force override
+    applyGfxQuality(resolveGfxQuality());
+    // High path needs offscreen + bloom scratch; low path draws to the visible canvas only
+    if (GFX.USE_OFFSCREEN_WORLD || GFX.ENABLE_BLOOM) this._initPresentationBuffers();
+
     const wrap = this.canvas.parentElement;
     const touchUi =
       typeof document !== "undefined" &&
@@ -268,8 +287,9 @@ export class Game {
     this.canvas.style.width = `${cssW}px`;
     this.canvas.style.height = `${cssH}px`;
 
-    // Retina / HiDPI backing store (capped; lower on touch UI for heat/battery)
-    const dprCap = touchUi ? Math.min(GFX.MAX_DPR, TOUCH_MAX_DPR) : GFX.MAX_DPR;
+    // Retina / HiDPI backing store (capped; lower on mobile quality + touch UI)
+    const touchCap = GFX.TOUCH_MAX_DPR ?? 1.25;
+    const dprCap = touchUi ? Math.min(GFX.MAX_DPR, touchCap) : GFX.MAX_DPR;
     const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
     this.dpr = dpr;
     const bw = Math.max(1, Math.round(WORLD_W * dpr));
@@ -277,12 +297,18 @@ export class Game {
 
     if (this.canvas.width !== bw) this.canvas.width = bw;
     if (this.canvas.height !== bh) this.canvas.height = bh;
-    if (this.worldCanvas) {
+
+    // Offscreen world only when the high-quality post path needs a source buffer
+    if (GFX.USE_OFFSCREEN_WORLD && this.worldCanvas) {
       if (this.worldCanvas.width !== bw) this.worldCanvas.width = bw;
       if (this.worldCanvas.height !== bh) this.worldCanvas.height = bh;
+    } else if (this.worldCanvas) {
+      // Release GPU memory on the mobile path
+      if (this.worldCanvas.width !== 0) this.worldCanvas.width = 0;
+      if (this.worldCanvas.height !== 0) this.worldCanvas.height = 0;
     }
 
-    if (this.bloomTight && this.bloomWide) {
+    if (GFX.ENABLE_BLOOM && this.bloomTight && this.bloomWide) {
       const tw = Math.max(2, Math.round(WORLD_W * dpr * GFX.BLOOM_RES));
       const th = Math.max(2, Math.round(WORLD_H * dpr * GFX.BLOOM_RES));
       if (this.bloomTight.width !== tw) this.bloomTight.width = tw;
@@ -292,6 +318,12 @@ export class Game {
       const wh = Math.max(2, Math.round(WORLD_H * dpr * GFX.BLOOM_WIDE_RES));
       if (this.bloomWide.width !== ww) this.bloomWide.width = ww;
       if (this.bloomWide.height !== wh) this.bloomWide.height = wh;
+    } else {
+      // Drop bloom scratch buffers when unused
+      if (this.bloomTight && this.bloomTight.width !== 0) this.bloomTight.width = 0;
+      if (this.bloomTight && this.bloomTight.height !== 0) this.bloomTight.height = 0;
+      if (this.bloomWide && this.bloomWide.width !== 0) this.bloomWide.width = 0;
+      if (this.bloomWide && this.bloomWide.height !== 0) this.bloomWide.height = 0;
     }
 
     const rect = this.canvas.getBoundingClientRect();
@@ -311,6 +343,7 @@ export class Game {
       visFracY,
       wrapW,
       wrapH,
+      quality: GFX.QUALITY,
     };
   }
 
@@ -2010,38 +2043,18 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     }
   }
 
-  _draw() {
-    const rect = this.canvas.getBoundingClientRect?.() || {
-      left: 0,
-      top: 0,
-      width: WORLD_W,
-      height: WORLD_H,
-    };
-    this.display.left = rect.left;
-    this.display.top = rect.top;
-    this.display.width = rect.width;
-    this.display.height = rect.height;
-
-    // Headless UAT: no presentation buffers — skip paint
-    if (!this.worldCtx || !this.worldCanvas || !this.ctx) return;
-
-    const dpr = this.dpr || 1;
-    const wctx = this.worldCtx;
-    const main = this.ctx;
-    const bw = this.worldCanvas.width;
-    const bh = this.worldCanvas.height;
-
-    // ── 1) World buffer (DPR-scaled logical world) ────────
-    wctx.setTransform(1, 0, 0, 1, 0, 0);
-    wctx.fillStyle = "#000005";
-    wctx.fillRect(0, 0, bw, bh);
+  /**
+   * Paint the playfield into `wctx` (world or main canvas) in DPR-scaled space.
+   * Shared by the high-quality offscreen path and the mobile direct path.
+   */
+  _paintWorld(wctx, dpr) {
+    const ww = this.world?.w || WORLD_W;
+    const wh = this.world?.h || WORLD_H;
+    const pulse = technoPulse(this.time, GFX.TECHNO_BPM);
 
     wctx.save();
     applyCameraTransform(wctx, this.cam, dpr);
     // Floor environment first…
-    const ww = this.world?.w || WORLD_W;
-    const wh = this.world?.h || WORLD_H;
-    const pulse = technoPulse(this.time, GFX.TECHNO_BPM);
     drawGrid(wctx, 0, 0, this.gridImpulses, this.time, ww, wh, pulse);
     if (this.arena) drawArena(wctx, this.arena, { time: this.time, cam: this.cam });
     // Morph danger telegraph (red zones about to become solid)
@@ -2092,32 +2105,87 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     // Screen-space flash in world pixels (not camera-warped)
     wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawBombFlash(wctx, this.bombFlash);
+    return pulse;
+  }
 
-    // ── 2) Present base world ─────────────────────────────
+  _draw() {
+    const rect = this.canvas.getBoundingClientRect?.() || {
+      left: 0,
+      top: 0,
+      width: WORLD_W,
+      height: WORLD_H,
+    };
+    this.display.left = rect.left;
+    this.display.top = rect.top;
+    this.display.width = rect.width;
+    this.display.height = rect.height;
+
+    // Headless UAT: no canvas context — skip paint
+    if (!this.ctx) return;
+
+    const dpr = this.dpr || 1;
+    const main = this.ctx;
+    const useOffscreen =
+      GFX.USE_OFFSCREEN_WORLD &&
+      this.worldCtx &&
+      this.worldCanvas &&
+      this.worldCanvas.width > 0 &&
+      this.worldCanvas.height > 0;
+
+    // ── Mobile / low quality: paint straight to the visible canvas ──
+    // Skips offscreen blit, CSS-filter bloom, and chromatic aberration.
+    if (!useOffscreen) {
+      main.setTransform(1, 0, 0, 1, 0, 0);
+      main.fillStyle = "#000005";
+      main.fillRect(0, 0, main.canvas.width, main.canvas.height);
+      this._paintWorld(main, dpr);
+
+      main.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (GFX.ENABLE_COLOR_GRADE) drawColorGrade(main, this.mult);
+      if (GFX.ENABLE_VIGNETTE) drawPostVignette(main, this.mult);
+      return;
+    }
+
+    // ── High quality: world buffer → present → bloom → CA → grade ──
+    const wctx = this.worldCtx;
+    const bw = this.worldCanvas.width;
+    const bh = this.worldCanvas.height;
+
+    wctx.setTransform(1, 0, 0, 1, 0, 0);
+    wctx.fillStyle = "#000005";
+    wctx.fillRect(0, 0, bw, bh);
+
+    const pulse = this._paintWorld(wctx, dpr);
+
+    // Present base world
     main.setTransform(1, 0, 0, 1, 0, 0);
     main.imageSmoothingEnabled = true;
     main.fillStyle = "#000005";
     main.fillRect(0, 0, main.canvas.width, main.canvas.height);
     main.drawImage(this.worldCanvas, 0, 0);
 
-    // ── 3) Bloom (tight + wide additive) + techno breath ─
-    compositeBloom(
-      main,
-      this.worldCanvas,
-      {
-        tight: this.bloomTight,
-        wide: this.bloomWide,
-      },
-      { pulse }
-    );
+    // Bloom (tight + wide additive) — desktop only
+    if (GFX.ENABLE_BLOOM && this.bloomTight && this.bloomWide) {
+      compositeBloom(
+        main,
+        this.worldCanvas,
+        {
+          tight: this.bloomTight,
+          wide: this.bloomWide,
+        },
+        { pulse }
+      );
+    }
 
-    // ── 4) Trauma chromatic fringe ────────────────────────
-    compositeChromatic(main, this.worldCanvas, this.cam.trauma, dpr);
+    // Trauma chromatic fringe — desktop only
+    if (GFX.ENABLE_CHROMATIC) {
+      compositeChromatic(main, this.worldCanvas, this.cam.trauma, dpr);
+    }
 
-    // ── 5) Mult color grade + vignette (world px space) ───
+    // Mult color grade + vignette (world px space)
     main.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawColorGrade(main, this.mult);
-    drawPostVignette(main, this.mult);
+    if (GFX.ENABLE_COLOR_GRADE) drawColorGrade(main, this.mult);
+    if (GFX.ENABLE_VIGNETTE) drawPostVignette(main, this.mult);
   }
 
   _loop(now) {

@@ -39,7 +39,9 @@ export function technoPulse(t = 0, bpm = GFX.TECHNO_BPM, beatsPerCycle = GFX.TEC
  * @param {{ pulse?: number }} [opts] optional techno pulse 0..1
  */
 export function compositeBloom(mainCtx, worldCanvas, buffers, opts = {}) {
+  if (!GFX.ENABLE_BLOOM) return;
   const { tight, wide } = buffers;
+  if (!tight || !wide) return;
   const tw = tight.width;
   const th = tight.height;
   const ww = wide.width;
@@ -98,7 +100,7 @@ export function compositeBloom(mainCtx, worldCanvas, buffers, opts = {}) {
  * @param {number} dpr
  */
 export function compositeChromatic(mainCtx, worldCanvas, trauma, dpr) {
-  if (GFX.REDUCED_FLASH) return;
+  if (!GFX.ENABLE_CHROMATIC || GFX.REDUCED_FLASH) return;
   const t = Math.min(1, Math.max(0, trauma || 0));
   if (t < GFX.CA_TRAUMA_MIN) return;
 
@@ -128,6 +130,7 @@ export function compositeChromatic(mainCtx, worldCanvas, trauma, dpr) {
  * Cool cyan stage → electric violet → hot magenta/ember as mult climbs (techno heat).
  */
 export function drawColorGrade(ctx, mult = 1) {
+  if (!GFX.ENABLE_COLOR_GRADE) return;
   const t = multGradeT(mult);
   const alpha = GFX.GRADE_BASE_ALPHA + t * GFX.GRADE_MULT_ALPHA;
 
@@ -182,6 +185,7 @@ export function drawColorGrade(ctx, mult = 1) {
  * World-pixel space; caller applies dpr transform.
  */
 export function drawPostVignette(ctx, mult = 1) {
+  if (!GFX.ENABLE_VIGNETTE) return;
   const t = multGradeT(mult);
   const edge = GFX.VIGNETTE_BASE + t * GFX.VIGNETTE_MULT_EXTRA;
   // Tighter inner radius as mult climbs
