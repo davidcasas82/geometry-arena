@@ -192,17 +192,46 @@ export const GFX_QUALITY_PRESETS = {
     vignette: true,
     /** Offscreen world buffer required for bloom / chromatic passes */
     offscreenWorld: true,
+    /** Full multi-pass neon + local radial blooms */
+    fancyNeon: true,
+    localBloom: true,
+    /** Warped reactive grid + underlay + under-grid */
+    fancyGrid: true,
+    gridStepMul: 1,
+    /** Floor contact shadows under entities */
+    floorShadows: "all", // 'all' | 'player' | 'none'
+    particleScale: 1,
+    particleMax: 1600,
+    floaterMax: 56,
+    afterimageMax: 12,
+    floaterShadow: true,
+    reducedFlash: false,
   },
   low: {
     id: "low",
-    maxDpr: 1.25,
-    touchMaxDpr: 1.25,
+    // 1× device pixels — biggest remaining mobile win after killing post-FX
+    maxDpr: 1,
+    touchMaxDpr: 1,
     bloom: false,
     chromatic: false,
-    // Cheap full-frame fills — keep a bit of mult heat without blur filters
-    colorGrade: true,
-    vignette: true,
+    colorGrade: false,
+    vignette: false,
     offscreenWorld: false,
+    // 2-pass stroke instead of 4–5; no per-entity radial blooms
+    fancyNeon: false,
+    localBloom: false,
+    // Straight grid, coarser step, no psychedelic underlay / under-grid
+    fancyGrid: false,
+    gridStepMul: 1.65,
+    // Player shadow only — skip enemy/geom contact lights
+    floorShadows: "player",
+    // Cut debris + vacuum density hard
+    particleScale: 0.35,
+    particleMax: 420,
+    floaterMax: 18,
+    afterimageMax: 4,
+    floaterShadow: false,
+    reducedFlash: true,
   },
 };
 
@@ -251,6 +280,18 @@ export function applyGfxQuality(tier) {
   GFX.ENABLE_COLOR_GRADE = !!preset.colorGrade;
   GFX.ENABLE_VIGNETTE = !!preset.vignette;
   GFX.USE_OFFSCREEN_WORLD = !!preset.offscreenWorld;
+  GFX.FANCY_NEON = preset.fancyNeon !== false;
+  GFX.LOCAL_BLOOM = preset.localBloom !== false;
+  GFX.FANCY_GRID = preset.fancyGrid !== false;
+  GFX.GRID_STEP_MUL = Math.max(1, preset.gridStepMul || 1);
+  GFX.FLOOR_SHADOWS = preset.floorShadows || "all";
+  GFX.PARTICLE_SCALE = Math.max(0.05, preset.particleScale ?? 1);
+  GFX.PARTICLE_MAX_LIVE = Math.max(40, preset.particleMax ?? PARTICLE_MAX);
+  GFX.FLOATER_MAX_LIVE = Math.max(4, preset.floaterMax ?? FLOATER_MAX);
+  GFX.AFTERIMAGE_MAX_LIVE = Math.max(0, preset.afterimageMax ?? AFTERIMAGE_MAX);
+  GFX.FLOATER_SHADOW = !!preset.floaterShadow;
+  // Low tier also damps flash-heavy paths already gated by REDUCED_FLASH
+  GFX.REDUCED_FLASH = !!preset.reducedFlash;
   return preset.id;
 }
 
@@ -274,13 +315,29 @@ export const GFX = {
   MAX_DPR: 2,
   /** Extra cap while touch chrome is active (phones / tablets) */
   TOUCH_MAX_DPR: 1.25,
-  /** Heavy post passes — disabled on the mobile quality path */
+/** Heavy post passes — disabled on the mobile quality path */
   ENABLE_BLOOM: true,
   ENABLE_CHROMATIC: true,
   ENABLE_COLOR_GRADE: true,
   ENABLE_VIGNETTE: true,
   /** When false, world draws straight to the visible canvas (no blit / bloom buffers) */
   USE_OFFSCREEN_WORLD: true,
+  /** Multi-pass neon strokes + white hot core */
+  FANCY_NEON: true,
+  /** Per-entity radial gradient blooms (very expensive on mobile GPU) */
+  LOCAL_BLOOM: true,
+  /** Warped grid, underlay, under-grid, impulse shimmer */
+  FANCY_GRID: true,
+  /** Multiplier on GRID_STEP (higher = fewer lines) */
+  GRID_STEP_MUL: 1,
+  /** 'all' | 'player' | 'none' */
+  FLOOR_SHADOWS: "all",
+  /** Scales burst/vacuum particle counts */
+  PARTICLE_SCALE: 1,
+  PARTICLE_MAX_LIVE: 1600,
+  FLOATER_MAX_LIVE: 56,
+  AFTERIMAGE_MAX_LIVE: 12,
+  FLOATER_SHADOW: true,
   /** Bloom buffer scale vs world (lower = cheaper, softer) */
   BLOOM_RES: 0.42,
   /** CSS filter blur radius in bloom-buffer pixels */

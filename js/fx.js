@@ -1,10 +1,14 @@
 /**
  * Shared neon drawing helpers — multi-pass glow like Geometry Wars.
  * Uses additive compositing carefully for bloom without full post-process.
+ * Low quality (mobile) collapses to 1–2 cheap strokes and skips local blooms.
  */
 
-/** Soft circular bloom under shapes */
+import { GFX } from "./constants.js";
+
+/** Soft circular bloom under shapes (no-op on low quality). */
 export function bloom(ctx, x, y, radius, color, alpha = 0.35) {
+  if (GFX.LOCAL_BLOOM === false) return;
   const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
   g.addColorStop(0, colorWithAlpha(color, alpha));
   g.addColorStop(0.45, colorWithAlpha(color, alpha * 0.35));
@@ -22,6 +26,19 @@ export function neonStroke(ctx, color, coreWidth = 2, glowWidth = 8, glowAlpha =
   ctx.save();
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
+
+  // Mobile: single body stroke + thin dark outline (2 passes vs 5)
+  if (GFX.FANCY_NEON === false) {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
+    ctx.lineWidth = coreWidth * 2.4;
+    ctx.stroke();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = coreWidth;
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
 
   // Dark silhouette strike first (contrast against busy floor)
   ctx.globalCompositeOperation = "source-over";
@@ -59,6 +76,19 @@ export function neonFillStroke(ctx, fillColor, strokeColor, coreWidth = 2) {
   ctx.lineCap = "round";
   ctx.fillStyle = fillColor;
   ctx.fill();
+
+  // Mobile: fill + one colored stroke (readable without multi-pass glow)
+  if (GFX.FANCY_NEON === false) {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.75)";
+    ctx.lineWidth = coreWidth * 2.6;
+    ctx.stroke();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = coreWidth * 1.15;
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
 
   // Dark outer strike — punches silhouette off multi-hue floor / bloom
   ctx.globalCompositeOperation = "source-over";

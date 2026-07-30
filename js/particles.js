@@ -1,6 +1,21 @@
 import { FLOATER_MAX, GFX, PARTICLE_MAX } from "./constants.js";
 import { colorWithAlpha } from "./fx.js";
 
+function particleCap() {
+  return Math.max(40, GFX.PARTICLE_MAX_LIVE ?? PARTICLE_MAX);
+}
+
+function floaterCap() {
+  return Math.max(4, GFX.FLOATER_MAX_LIVE ?? FLOATER_MAX);
+}
+
+/** Scale spawn counts for the active quality tier (mobile cuts hard). */
+function scaleCount(n, floor = 0) {
+  const s = GFX.PARTICLE_SCALE ?? 1;
+  if (s >= 0.999) return n;
+  return Math.max(floor, Math.round(n * s));
+}
+
 /**
  * Additive neon particles — sparks, streaks, rings, thruster dust,
  * vacuum inhale streams + electric bolts.
@@ -16,7 +31,8 @@ export class ParticleSystem {
   }
 
   burst(x, y, color, count = 28, speed = 320) {
-    const room = PARTICLE_MAX - this.particles.length;
+    const room = particleCap() - this.particles.length;
+    count = scaleCount(count, 2);
     const n = Math.min(count, Math.max(0, room));
     const streakLife = GFX.KILL_STREAK_LIFE || 0.26;
     const softLife = GFX.KILL_SOFT_LIFE || 0.32;
@@ -41,8 +57,8 @@ export class ParticleSystem {
         hot: isStreak || Math.random() < 0.55,
       });
     }
-    // White-hot core sparks (first-frame punch)
-    const coreN = Math.min(18, Math.max(0, room - n));
+// White-hot core sparks (first-frame punch)
+    const coreN = Math.min(scaleCount(18, 0), Math.max(0, room - n));
     for (let i = 0; i < coreN; i++) {
       const ang = Math.random() * Math.PI * 2;
       const sp = speed * (0.85 + Math.random() * 1.1);
@@ -62,8 +78,9 @@ export class ParticleSystem {
     }
   }
 
-  ring(x, y, color, count = 40, speed = 360) {
-    const room = PARTICLE_MAX - this.particles.length;
+ring(x, y, color, count = 40, speed = 360) {
+    const room = particleCap() - this.particles.length;
+    count = scaleCount(count, 4);
     const n = Math.min(count, Math.max(0, room));
     for (let i = 0; i < n; i++) {
       const ang = (i / n) * Math.PI * 2 + Math.random() * 0.05;
@@ -82,7 +99,7 @@ export class ParticleSystem {
         hot: i % 2 === 0,
       });
     }
-    // Dual expanding shockwave rings — short-lived white core + color
+// Dual expanding shockwave rings — short-lived white core + color
     this.rings.push({
       x,
       y,
@@ -93,16 +110,18 @@ export class ParticleSystem {
       color,
       width: 4.2,
     });
-    this.rings.push({
-      x,
-      y,
-      r: 3,
-      vr: speed * 1.05,
-      life: 0.24,
-      maxLife: 0.24,
-      color: "#ffffff",
-      width: 2.4,
-    });
+    if ((GFX.PARTICLE_SCALE ?? 1) > 0.55) {
+      this.rings.push({
+        x,
+        y,
+        r: 3,
+        vr: speed * 1.05,
+        life: 0.24,
+        maxLife: 0.24,
+        color: "#ffffff",
+        width: 2.4,
+      });
+    }
   }
 
   shockwave(x, y, color = "#ffe14a", maxR = 520) {
@@ -117,43 +136,48 @@ export class ParticleSystem {
       color,
       width: 8,
     });
-    // Mid glow
-    this.rings.push({
-      x,
-      y,
-      r: 8,
-      vr: maxR * 2.0,
-      life: 0.55,
-      maxLife: 0.55,
-      color,
-      width: 5,
-    });
-    // Hot white core front
-    this.rings.push({
-      x,
-      y,
-      r: 4,
-      vr: maxR * 1.7,
-      life: 0.45,
-      maxLife: 0.45,
-      color: "#ffffff",
-      width: 3,
-    });
-    // Delayed secondary pop
-    this.rings.push({
-      x,
-      y,
-      r: 2,
-      vr: maxR * 1.1,
-      life: 0.65,
-      maxLife: 0.65,
-      color: color,
-      width: 2.5,
-    });
+    // On low quality keep a single ring; high keeps the multi-layer blast
+    if ((GFX.PARTICLE_SCALE ?? 1) > 0.55) {
+      // Mid glow
+      this.rings.push({
+        x,
+        y,
+        r: 8,
+        vr: maxR * 2.0,
+        life: 0.55,
+        maxLife: 0.55,
+        color,
+        width: 5,
+      });
+      // Hot white core front
+      this.rings.push({
+        x,
+        y,
+        r: 4,
+        vr: maxR * 1.7,
+        life: 0.45,
+        maxLife: 0.45,
+        color: "#ffffff",
+        width: 3,
+      });
+      // Delayed secondary pop
+      this.rings.push({
+        x,
+        y,
+        r: 2,
+        vr: maxR * 1.1,
+        life: 0.65,
+        maxLife: 0.65,
+        color: color,
+        width: 2.5,
+      });
+    }
   }
 
   trail(x, y, vx, vy, color = "#5efcff") {
-    if (this.particles.length >= PARTICLE_MAX - 2) return;
+    if (this.particles.length >= particleCap() - 2) return;
+    // Mobile: skip thruster dust entirely
+    if ((GFX.PARTICLE_SCALE ?? 1) < 0.6) return;
     const sp = Math.hypot(vx, vy);
     if (sp < 25) return;
     const nx = -vx / sp;
@@ -174,8 +198,8 @@ export class ParticleSystem {
     }
   }
 
-  floater(x, y, text, color = "#ffffff", scale = 1) {
-    if (this.floaters.length >= FLOATER_MAX) this.floaters.shift();
+floater(x, y, text, color = "#ffffff", scale = 1) {
+    if (this.floaters.length >= floaterCap()) this.floaters.shift();
     this.floaters.push({
       x: x + (Math.random() - 0.5) * 12,
       y,
@@ -192,10 +216,10 @@ export class ParticleSystem {
    * Geom vacuum FX — inbound energy streams + electric arcs (not expanding rings).
    * Particles spawn around the ship and suck inward like a magnetic pulse.
    */
-  vacuumInhale(cx, cy, color = "#b8ff4a") {
-    const room = PARTICLE_MAX - this.particles.length;
+vacuumInhale(cx, cy, color = "#b8ff4a") {
+    const room = particleCap() - this.particles.length;
     // Radial stream particles (spawn far out, rocket in)
-    const streamN = Math.min(90, Math.max(0, room));
+    const streamN = Math.min(scaleCount(90, 12), Math.max(0, room));
     for (let i = 0; i < streamN; i++) {
       const ang = (i / streamN) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
       const dist = 90 + Math.random() * 420;
@@ -224,8 +248,8 @@ export class ParticleSystem {
       });
     }
 
-    // Secondary hot spark rain (closer band)
-    const sparkN = Math.min(40, Math.max(0, PARTICLE_MAX - this.particles.length));
+// Secondary hot spark rain (closer band)
+    const sparkN = Math.min(scaleCount(40, 0), Math.max(0, particleCap() - this.particles.length));
     for (let i = 0; i < sparkN; i++) {
       const ang = Math.random() * Math.PI * 2;
       const dist = 40 + Math.random() * 140;
@@ -249,8 +273,8 @@ export class ParticleSystem {
       });
     }
 
-    // Jagged lightning bolts: outer rim → ship
-    const boltCount = 10 + Math.floor(Math.random() * 5);
+// Jagged lightning bolts: outer rim → ship
+    const boltCount = scaleCount(10 + Math.floor(Math.random() * 5), 2);
     for (let b = 0; b < boltCount; b++) {
       this._spawnVacuumBolt(cx, cy, color, 160 + Math.random() * 380);
     }
@@ -264,8 +288,8 @@ export class ParticleSystem {
     if (intensity <= 0.05) return;
     if (Math.random() > 0.55 + intensity * 0.35) return;
 
-    const room = PARTICLE_MAX - this.particles.length;
-    const n = Math.min(8 + Math.floor(intensity * 14), Math.max(0, room));
+const room = particleCap() - this.particles.length;
+    const n = Math.min(scaleCount(8 + Math.floor(intensity * 14), 1), Math.max(0, room));
     for (let i = 0; i < n; i++) {
       const ang = Math.random() * Math.PI * 2;
       const dist = 70 + Math.random() * 360 * (0.5 + intensity * 0.5);
@@ -322,8 +346,8 @@ export class ParticleSystem {
       color,
       width: 1.2 + Math.random() * 2.2,
     });
-    // Twin ghost bolt (white hot, thinner, shorter life)
-    if (Math.random() < 0.55) {
+// Twin ghost bolt (white hot, thinner, shorter life)
+    if ((GFX.PARTICLE_SCALE ?? 1) > 0.55 && Math.random() < 0.55) {
       this.bolts.push({
         points: points.map((p) => ({
           x: p.x + (Math.random() - 0.5) * 4,
@@ -426,7 +450,7 @@ export class ParticleSystem {
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(p.x - tx, p.y - ty);
         ctx.stroke();
-        if (p.hot || p.attract) {
+if ((p.hot || p.attract) && GFX.FANCY_NEON !== false) {
           ctx.strokeStyle = `rgba(255,255,255,${a * 0.55})`;
           ctx.lineWidth = Math.max(0.6, p.size * a * 0.35);
           ctx.beginPath();
@@ -439,7 +463,7 @@ export class ParticleSystem {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * a, 0, Math.PI * 2);
         ctx.fill();
-        if (p.hot) {
+        if (p.hot && GFX.FANCY_NEON !== false) {
           ctx.fillStyle = `rgba(255,255,255,${a * 0.7})`;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * a * 0.4, 0, Math.PI * 2);
@@ -450,6 +474,14 @@ export class ParticleSystem {
 
     for (const r of this.rings) {
       const a = Math.max(0, r.life / r.maxLife);
+      if (GFX.FANCY_NEON === false) {
+        ctx.strokeStyle = colorWithAlpha(r.color, a * 0.9);
+        ctx.lineWidth = r.width * a;
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+        ctx.stroke();
+        continue;
+      }
       // Outer soft glow stroke + bright core stroke
       ctx.strokeStyle = colorWithAlpha(r.color, a * 0.45);
       ctx.lineWidth = r.width * a * 2.4;
@@ -467,11 +499,22 @@ export class ParticleSystem {
     for (const b of this.bolts) {
       if (!b.points || b.points.length < 2) continue;
       const a = Math.max(0, b.life / b.maxLife);
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      if (GFX.FANCY_NEON === false) {
+        ctx.strokeStyle = colorWithAlpha(b.color, a * 0.95);
+        ctx.lineWidth = b.width * a;
+        ctx.beginPath();
+        ctx.moveTo(b.points[0].x, b.points[0].y);
+        for (let i = 1; i < b.points.length; i++) {
+          ctx.lineTo(b.points[i].x, b.points[i].y);
+        }
+        ctx.stroke();
+        continue;
+      }
       // Soft outer glow
       ctx.strokeStyle = colorWithAlpha(b.color, a * 0.35);
       ctx.lineWidth = b.width * a * 3.2;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
       ctx.beginPath();
       ctx.moveTo(b.points[0].x, b.points[0].y);
       for (let i = 1; i < b.points.length; i++) {
@@ -511,8 +554,10 @@ export class ParticleSystem {
       ctx.scale(sc, sc);
       ctx.globalAlpha = a;
       ctx.font = "700 15px Orbitron, Outfit, sans-serif";
-      ctx.shadowColor = f.color;
-      ctx.shadowBlur = 12;
+      if (GFX.FLOATER_SHADOW !== false) {
+        ctx.shadowColor = f.color;
+        ctx.shadowBlur = 12;
+      }
       ctx.fillStyle = f.color;
       ctx.fillText(f.text, 0, 0);
       ctx.shadowBlur = 0;

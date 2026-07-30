@@ -92,6 +92,9 @@ export function drawGrid(
 ) {
   const W = worldW || WORLD_W;
   const H = worldH || WORLD_H;
+  const fancy = GFX.FANCY_GRID !== false;
+  const stepMul = Math.max(1, GFX.GRID_STEP_MUL || 1);
+  const step = Math.max(24, Math.round(GRID_STEP * stepMul));
   ctx.save();
   ctx.translate(shakeX, shakeY);
 
@@ -99,35 +102,96 @@ export function drawGrid(
   ctx.fillStyle = COLORS.bgDeep;
   ctx.fillRect(-8, -8, W + 16, H + 16);
 
-  // Floor plate — dark navy/void so neon shapes keep punch
-  const floor = ctx.createLinearGradient(0, 0, 0, H);
-  floor.addColorStop(0, "rgba(5, 8, 22, 0.97)");
-  floor.addColorStop(0.45, "rgba(3, 5, 16, 0.99)");
-  floor.addColorStop(1, "rgba(1, 2, 10, 1)");
-  ctx.fillStyle = floor;
+  // Floor plate — solid fill on low; gradient on high
+  if (fancy) {
+    const floor = ctx.createLinearGradient(0, 0, 0, H);
+    floor.addColorStop(0, "rgba(5, 8, 22, 0.97)");
+    floor.addColorStop(0.45, "rgba(3, 5, 16, 0.99)");
+    floor.addColorStop(1, "rgba(1, 2, 10, 1)");
+    ctx.fillStyle = floor;
+  } else {
+    ctx.fillStyle = "rgba(3, 5, 16, 1)";
+  }
   ctx.fillRect(0, 0, W, H);
 
-  // Quiet multi-hue accent under the grid (not a full wash)
-  drawPsychedelicUnderlay(ctx, W, H, t);
+  if (fancy) {
+    // Quiet multi-hue accent under the grid (not a full wash)
+    drawPsychedelicUnderlay(ctx, W, H, t);
 
-  // Soft stage light — mostly dark edges, cool center
-  const vg = ctx.createRadialGradient(
-    W / 2,
-    H / 2,
-    50,
-    W / 2,
-    H / 2,
-    W * 0.7
-  );
-  vg.addColorStop(0, "rgba(28, 70, 140, 0.14)");
-  vg.addColorStop(0.55, "rgba(12, 24, 55, 0.08)");
-  vg.addColorStop(1, "rgba(0, 0, 0, 0.42)");
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, W, H);
+    // Soft stage light — mostly dark edges, cool center
+    const vg = ctx.createRadialGradient(
+      W / 2,
+      H / 2,
+      50,
+      W / 2,
+      H / 2,
+      W * 0.7
+    );
+    vg.addColorStop(0, "rgba(28, 70, 140, 0.14)");
+    vg.addColorStop(0.55, "rgba(12, 24, 55, 0.08)");
+    vg.addColorStop(1, "rgba(0, 0, 0, 0.42)");
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+  }
 
-  const step = GRID_STEP;
   const pulseAmt = Math.max(0, Math.min(1, pulse));
   const majorBoost = 1 + (pulseAmt - 0.5) * 2 * (GFX.GRID_PULSE_DEPTH || 0.22);
+
+  // Low quality: axis-aligned straight lines (no per-vertex warp / shimmer)
+  if (!fancy) {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = COLORS.grid;
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += step) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+    }
+    for (let y = 0; y <= H; y += step) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+    }
+    ctx.stroke();
+
+    // Sparse major beams (single path batch)
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = COLORS.gridMajor;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    const major = step * 4;
+    for (let x = 0; x <= W; x += major) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+    }
+    for (let y = 0; y <= H; y += major) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // Simple rim
+    ctx.strokeStyle = "rgba(80, 200, 255, 0.4)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, W - 4, H - 4);
+
+    // Cheap impulse dots (no radial bloom gradients)
+    if (impulses.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (const imp of impulses) {
+        const a = (imp.life / imp.maxLife) * 0.35 * imp.strength;
+        ctx.fillStyle = colorWithAlpha(COLORS.gridGlow, a);
+        ctx.beginPath();
+        ctx.arc(imp.x, imp.y, 18 + imp.strength * 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    ctx.restore();
+    return;
+  }
 
   function warp(px, py) {
     let ox = 0;
@@ -302,11 +366,18 @@ export function drawFloorShadow(ctx, x, y, radius, alpha = 0.45) {
  * Floor pass: all shadows + contact lights under entities (drawn before hover layer).
  */
 export function drawFloorShadows(ctx, player, enemies, geoms, t = 0) {
+  const mode = GFX.FLOOR_SHADOWS || "all";
+  if (mode === "none") return;
+
   // Player
   if (player) {
     drawFloorShadow(ctx, player.x, player.y, player.r * 2.8, 0.5);
-    drawFloorContact(ctx, player.x, player.y, player.r * 3.2, COLORS.player, 0.2);
+    if (mode === "all") {
+      drawFloorContact(ctx, player.x, player.y, player.r * 3.2, COLORS.player, 0.2);
+    }
   }
+  if (mode === "player") return;
+
   // Enemies — skip / dim shadows during outline telegraph
   for (const e of enemies) {
     if (e.dead) continue;
@@ -440,17 +511,21 @@ export function drawBullets(ctx, bullets) {
     const by = hoverY(b.y, 2);
     const r = b.r + 1.2;
 
-    // Tiny floor dash under bolt (depth cue)
-    drawFloorShadow(ctx, b.x, b.y, r * 1.8, 0.22);
+// Tiny floor dash under bolt (depth cue) — high quality only
+    if ((GFX.FLOOR_SHADOWS || "all") === "all") {
+      drawFloorShadow(ctx, b.x, b.y, r * 1.8, 0.22);
+    }
 
-    const glow = ctx.createRadialGradient(bx, by, 0, bx, by, r * 3.2);
-    glow.addColorStop(0, "rgba(180, 245, 255, 0.85)");
-    glow.addColorStop(0.35, "rgba(90, 220, 255, 0.35)");
-    glow.addColorStop(1, "rgba(90, 220, 255, 0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(bx, by, r * 3.2, 0, Math.PI * 2);
-    ctx.fill();
+    if (GFX.LOCAL_BLOOM !== false) {
+      const glow = ctx.createRadialGradient(bx, by, 0, bx, by, r * 3.2);
+      glow.addColorStop(0, "rgba(180, 245, 255, 0.85)");
+      glow.addColorStop(0.35, "rgba(90, 220, 255, 0.35)");
+      glow.addColorStop(1, "rgba(90, 220, 255, 0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(bx, by, r * 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     const sp = Math.hypot(b.vx, b.vy) || 1;
     const tx = (b.vx / sp) * (r * 1.1);
@@ -628,13 +703,22 @@ function drawEnemyOutline(ctx, e, t = 0) {
   // Full size silhouette — outline is the threat shape
   enemySilhouettePath(ctx, e, t);
 
+const a = 0.75 + 0.25 * pulse;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  if (GFX.FANCY_NEON === false) {
+    // Mobile: one thick danger stroke — still reads as telegraph
+    ctx.strokeStyle = colorWithAlpha(COLORS.danger, a);
+    ctx.lineWidth = 4.2;
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   ctx.globalCompositeOperation = "lighter";
-  const a = 0.75 + 0.25 * pulse;
   // Thick outer danger halo
   ctx.strokeStyle = colorWithAlpha(COLORS.danger, a * 0.55);
   ctx.lineWidth = 10;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
   ctx.stroke();
   // Core danger stroke
   ctx.strokeStyle = colorWithAlpha(COLORS.danger, a);

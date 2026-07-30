@@ -1938,7 +1938,7 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
       visFracY: this.display?.visFracY ?? 1,
     });
 
-    // Thruster dust + motion afterimages
+// Thruster dust + motion afterimages
     this.particles.trail(
       this.player.x,
       this.player.y,
@@ -1947,16 +1947,19 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
       COLORS.player
     );
     this.afterimageTimer -= dt;
+    const afterMax = GFX.AFTERIMAGE_MAX_LIVE ?? AFTERIMAGE_MAX;
     const spd = Math.hypot(this.player.vx, this.player.vy);
-    if (spd > 40 && this.afterimageTimer <= 0) {
-      this.afterimageTimer = 0.028;
+    if (afterMax > 0 && spd > 40 && this.afterimageTimer <= 0) {
+      this.afterimageTimer = GFX.QUALITY === "low" ? 0.055 : 0.028;
       this.afterimages.push({
         x: this.player.x,
         y: this.player.y,
         angle: this.player.angle,
         life: 0.18,
       });
-      if (this.afterimages.length > AFTERIMAGE_MAX) this.afterimages.shift();
+      if (this.afterimages.length > afterMax) this.afterimages.shift();
+    } else if (afterMax <= 0 && this.afterimages.length) {
+      this.afterimages.length = 0;
     }
     for (let i = this.afterimages.length - 1; i >= 0; i--) {
       this.afterimages[i].life -= dt;
@@ -2108,17 +2111,23 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     return pulse;
   }
 
-  _draw() {
-    const rect = this.canvas.getBoundingClientRect?.() || {
-      left: 0,
-      top: 0,
-      width: WORLD_W,
-      height: WORLD_H,
-    };
-    this.display.left = rect.left;
-    this.display.top = rect.top;
-    this.display.width = rect.width;
-    this.display.height = rect.height;
+_draw() {
+    // Layout rect is only needed for pointer mapping / cover-crop camera.
+    // Avoid forced style recalc every frame on mobile — refresh ~4×/sec or on resize.
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    if (!this._nextLayoutAt || now >= this._nextLayoutAt) {
+      this._nextLayoutAt = now + (GFX.QUALITY === "low" ? 250 : 100);
+      const rect = this.canvas.getBoundingClientRect?.() || {
+        left: 0,
+        top: 0,
+        width: WORLD_W,
+        height: WORLD_H,
+      };
+      this.display.left = rect.left;
+      this.display.top = rect.top;
+      this.display.width = rect.width;
+      this.display.height = rect.height;
+    }
 
     // Headless UAT: no canvas context — skip paint
     if (!this.ctx) return;
@@ -2208,15 +2217,16 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
         const id = this.pathLevel.id;
         this.startLevel(id);
       }
-      if (this.state === "menu") {
+if (this.state === "menu") {
         this.time += dt;
         this.player.angle += dt * 0.85;
         this.particles.update(dt * 0.5);
         updateMenuCamera(this.cam, dt);
         // Soft geom rain — pickups drift through the title arena
         this._updateMenuGeoms(dt);
-        // Ambient grid pulses — sell the "living arena" on the title screen
-        if (Math.random() < 0.035) {
+        // Ambient grid pulses — much quieter on mobile quality
+        const ambientRate = GFX.QUALITY === "low" ? 0.008 : 0.035;
+        if (Math.random() < ambientRate) {
           this._gridPulse(
             Math.random() * WORLD_W,
             Math.random() * WORLD_H,
@@ -2231,7 +2241,9 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
           );
         }
         // Occasional geom drop from the top
-        if (Math.random() < 0.06 && this.geoms.length < 28) {
+        const geomRate = GFX.QUALITY === "low" ? 0.02 : 0.06;
+        const geomCap = GFX.QUALITY === "low" ? 12 : 28;
+        if (Math.random() < geomRate && this.geoms.length < geomCap) {
           const g = createGeom(40 + Math.random() * (WORLD_W - 80), -12 - Math.random() * 40);
           g.vx = (Math.random() - 0.5) * 40;
           g.vy = 40 + Math.random() * 70;
