@@ -52,7 +52,7 @@ body {
 .bottom-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 14px;
   flex-wrap: wrap;
 }
@@ -1960,11 +1960,6 @@ body.touch-ui .gameover-actions .btn.arcade {
   border-color: rgba(125, 249, 255, 0.3);
 }
 
-.bottom-bar .hint {
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-
 .actions {
   display: flex;
   gap: 8px;
@@ -1995,10 +1990,6 @@ body.touch-ui .gameover-actions .btn.arcade {
 
   .stat-value {
     font-size: 1.1rem;
-  }
-
-  .bottom-bar .hint {
-    display: none;
   }
 }
 
