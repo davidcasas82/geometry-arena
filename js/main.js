@@ -1,12 +1,19 @@
 import { Game } from "./game.js";
-import { applyGfxQuality, GFX, resolveGfxQuality } from "./constants.js";
-import { dumpRunsToConsole, getRecentRuns } from "./runs.js";
+import {
+  applyGfxQuality,
+  GFX,
+  preferMobileGraphics,
+  resolveGfxQuality,
+} from "./constants.js";
+import { dumpRunsToConsole, getRecentDeaths, getRecentRuns } from "./runs.js";
 import {
   CHAPTER_TITLES,
+  describeStarGap,
   getLevel,
   getNextLevelId,
   listPathLevels,
   maxPathStars,
+  topologyLabel,
   totalStarsEarned,
 } from "./levels.js";
 import {
@@ -28,6 +35,7 @@ const pauseBtn = document.getElementById("pause-btn");
 const muteBtn = document.getElementById("mute-btn");
 const helpBtn = document.getElementById("help-btn");
 const panelHelpBtn = document.getElementById("panel-help-btn");
+const panelMuteBtn = document.getElementById("panel-mute-btn");
 const scoreEl = document.getElementById("score");
 const levelEl = document.getElementById("level");
 const multEl = document.getElementById("mult");
@@ -120,15 +128,24 @@ let titleAction = null;
 let splashDone = false;
 let helpOpen = false;
 let panelHelpOpen = false;
+let uiFocus = 0;
 
-/** Phones / tablets: touch points + coarse pointer or narrow viewport. */
+/** Same device class as low GFX — iPadOS included. Wide hover laptops stay mouse. */
 function preferTouchUI() {
   if (typeof window === "undefined") return false;
-  const touchPoints = navigator.maxTouchPoints || 0;
-  if (touchPoints <= 0) return false;
-  const coarse = window.matchMedia("(pointer: coarse)").matches;
-  const narrow = window.matchMedia("(max-width: 900px)").matches;
-  return coarse || narrow;
+  if (!preferMobileGraphics()) return false;
+  try {
+    const hoverFine = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    const wide = window.matchMedia("(min-width: 1101px)").matches;
+    const ua = navigator.userAgent || "";
+    const ipad =
+      /iPad|iPhone|iPod/i.test(ua) ||
+      (navigator.platform === "MacIntel" && (navigator.maxTouchPoints || 0) > 1);
+    if (hoverFine && wide && !ipad) return false;
+  } catch {
+    /* matchMedia */
+  }
+  return true;
 }
 
 function syncTouchChrome() {
@@ -195,7 +212,80 @@ function setOverlayMode(mode) {
 function resetPanelHelp() {
   panelHelpOpen = false;
   panelHowto?.classList.add("hidden");
-  if (panelHelpBtn) panelHelpBtn.textContent = "HOW TO PLAY";
+  if (panelHelpBtn) panelHelpBtn.textContent = "How to play";
+}
+
+function visibleEls(list) {
+  return list.filter((el) => {
+    if (!el || el.classList.contains("hidden")) return false;
+    if (el.offsetParent !== null) return true;
+    // offsetParent is null for position:fixed / some flex children — still accept painted buttons
+    const s = typeof getComputedStyle === "function" ? getComputedStyle(el) : null;
+    return !s || (s.display !== "none" && s.visibility !== "hidden");
+  });
+}
+
+function applyUiFocus(els, index) {
+  if (!els.length) return;
+  uiFocus = ((index % els.length) + els.length) % els.length;
+  els.forEach((el, i) => el.classList.toggle("is-focused", i === uiFocus));
+}
+
+function stepUiFocus(els, delta) {
+  if (!els.length || !delta) return;
+  applyUiFocus(els, uiFocus + delta);
+}
+
+function navDelta(nav) {
+  if (!nav) return 0;
+  if (nav.x) return nav.x;
+  if (nav.y) return nav.y;
+  return 0;
+}
+
+function clickFocused(els) {
+  const el = els[uiFocus] || els[0];
+  el?.click();
+}
+
+function titleTargets() {
+  return visibleEls([startBtn, pathBtn, helpBtn]);
+}
+
+function pauseTargets() {
+  return visibleEls([interruptBtn, resumeBtn, titleBtn, panelHelpBtn, panelMuteBtn]);
+}
+
+function gameoverTargets() {
+  return visibleEls([goAgainBtn, goTitleBtn]);
+}
+
+function briefTargets() {
+  return visibleEls([briefStartBtn, briefBackBtn]);
+}
+
+function pathMapTargets() {
+  return visibleEls([pathSelectBtn, pathBackBtn]);
+}
+
+function resultTargets() {
+  return visibleEls([prPrimaryBtn, prRetryBtn, prMapBtn, prTitleBtn]);
+}
+
+function movePathFocus(delta) {
+  const levels = listPathLevels();
+  if (!levels.length) return;
+  const idx = Math.max(0, levels.findIndex((l) => l.id === pathFocusId));
+  const n = levels[Math.max(0, Math.min(levels.length - 1, idx + delta))];
+  if (n) {
+    pathFocusId = n.id;
+    renderPathMap();
+  }
+}
+
+function syncPanelMute() {
+  const on = game?.audio?.enabled !== false;
+  if (panelMuteBtn) panelMuteBtn.textContent = on ? "SOUND ON" : "MUTED";
 }
 
 /** Live-grid title menu (post-splash / return to menu). */
@@ -209,7 +299,7 @@ function showTitleMenu() {
   stopPathHudPoll();
   helpOpen = false;
   howTo?.classList.add("hidden");
-  if (helpBtn) helpBtn.textContent = "HOW TO PLAY";
+  if (helpBtn) helpBtn.textContent = "How to play";
   resetPanelHelp();
   titleBtn?.classList.add("hidden");
   resumeBtn?.classList.add("hidden");
@@ -226,6 +316,7 @@ function showTitleMenu() {
     titleMenu.classList.add("entering");
   }
   overlay?.classList.remove("hidden");
+  applyUiFocus(titleTargets(), 0);
   syncTouchChrome();
 }
 
@@ -397,9 +488,9 @@ function updatePathFocusPanel(level, progress) {
   if (pathFocusTag) pathFocusTag.textContent = level.tagline || "";
 if (pathFocusMode) pathFocusMode.textContent = String(level.mode).toUpperCase();
   if (pathFocusArena) {
-    // MVP: all Path levels use classic rect — show pressure focus, not topology
-    pathFocusArena.textContent = "ARENA";
-    pathFocusArena.title = "Classic rectangle playfield";
+    const topo = level.arena?.topology || "rect";
+    pathFocusArena.textContent = topologyLabel(topo);
+    pathFocusArena.title = String(topo).replace(/_/g, " ");
   }
   // Prefer clear win condition over flavor lesson in the focus card
   if (pathFocusLesson) {
@@ -489,6 +580,7 @@ function showPathMap() {
   renderPathMap();
   setOverlayMode("path");
   overlay?.classList.remove("hidden");
+  applyUiFocus(pathMapTargets(), 0);
   syncTouchChrome();
 }
 
@@ -504,8 +596,9 @@ function showPathBrief(levelId) {
   if (briefTag) briefTag.textContent = level.tagline || "";
 if (briefMode) briefMode.textContent = String(level.mode).toUpperCase();
   if (briefArena) {
-    briefArena.textContent = "ARENA";
-    briefArena.title = "Classic rectangle playfield";
+    const topo = level.arena?.topology || "rect";
+    briefArena.textContent = topologyLabel(topo);
+    briefArena.title = String(topo).replace(/_/g, " ");
   }
   if (briefObjective) briefObjective.textContent = objectiveForLevel(level);
   if (briefLesson) {
@@ -514,6 +607,7 @@ if (briefMode) briefMode.textContent = String(level.mode).toUpperCase();
   }
   setOverlayMode("brief");
   overlay?.classList.remove("hidden");
+  applyUiFocus(briefTargets(), 0);
   syncTouchChrome();
 }
 
@@ -621,9 +715,20 @@ function showPathResultUI(result) {
   const best = loadProgress().bestScore?.[r.levelId || pathActiveId] || score;
   if (prBest) prBest.textContent = format(best);
   if (pathResultMeta) {
+    const extra = {
+      cleared,
+      peakMult: r.peakMult ?? r.extra?.peakMult,
+      timeLeftSec: r.timeLeftSec ?? r.extra?.timeLeftSec,
+      elapsedSec: elapsed,
+      livesLeft: r.livesLeft ?? r.extra?.livesLeft,
+      onTimeGates: r.onTimeGates ?? r.extra?.onTimeGates,
+    };
+    const gap = level ? describeStarGap(level, score, extra, stars) : "";
     pathResultMeta.textContent = cleared
-      ? `${starGlyphs(stars)}  ·  ${level?.mode?.toUpperCase() || "PATH"}`
-      : "RETRY TO ADVANCE";
+      ? gap || `${starGlyphs(stars)}  ·  ${level?.mode?.toUpperCase() || "PATH"}`
+      : gap && gap !== "CLEAR TO UNLOCK STARS"
+        ? `RETRY TO ADVANCE  ·  ${gap}`
+        : "RETRY TO ADVANCE";
   }
   pathResultStars?.querySelectorAll?.(".star-pip")?.forEach((el, i) => {
     el.classList.toggle("on", i < stars);
@@ -661,6 +766,7 @@ function showPathResultUI(result) {
     pathResult.classList.add("entering");
   }
   overlay?.classList.remove("hidden");
+  applyUiFocus(resultTargets(), 0);
   // Return game to menu ambient without Classic gameover
   try {
     if (game.state === "path_clear" || game.state === "path_fail" || game.state === "playing") {
@@ -799,13 +905,17 @@ if (level && pathObjectiveEl) {
     resetPanelHelp();
     if (opts.showHelp) {
       panelHelpBtn?.classList.remove("hidden");
+      panelMuteBtn?.classList.remove("hidden");
     } else {
       panelHelpBtn?.classList.add("hidden");
+      panelMuteBtn?.classList.add("hidden");
     }
+    syncPanelMute();
 
     howTo?.classList.add("hidden");
     setOverlayMode("panel");
     overlay.classList.remove("hidden");
+    applyUiFocus(pauseTargets(), 0);
     syncTouchChrome();
   },
   /**
@@ -860,6 +970,7 @@ if (level && pathObjectiveEl) {
     titleBtn?.classList.add("hidden");
     resumeBtn?.classList.add("hidden");
     panelHelpBtn?.classList.add("hidden");
+    panelMuteBtn?.classList.add("hidden");
 
     setOverlayMode("gameover");
     if (gameoverMenu) {
@@ -868,11 +979,13 @@ if (level && pathObjectiveEl) {
       gameoverMenu.classList.add("entering");
     }
     overlay?.classList.remove("hidden");
+    applyUiFocus(gameoverTargets(), 0);
     syncTouchChrome();
   },
   showTitleMenu,
   setMuteLabel(on) {
     muteBtn.textContent = on ? "Sound" : "Muted";
+    syncPanelMute();
   },
 };
 
@@ -923,6 +1036,7 @@ game = new Game(canvas, ui);
 window.__geometryArena = game;
 window.__arenaRuns = () => dumpRunsToConsole();
 window.__arenaRecent = () => getRecentRuns(10);
+window.__arenaDeaths = () => getRecentDeaths(20);
 window.__arenaPath = () => exportProgressDebug();
 /** Force presentation tier: setGfxQuality('low'|'high') or null to clear override. */
 window.setGfxQuality = (tier) => game.setGfxQuality(tier === "auto" ? null : tier);
@@ -950,6 +1064,16 @@ window.addEventListener("orientationchange", () => {
 window.matchMedia("(pointer: coarse)").addEventListener?.("change", syncTouchChrome);
 window.matchMedia("(max-width: 900px)").addEventListener?.("change", syncTouchChrome);
 
+// App switch / lock / tab hide must not keep the sim running (death on return).
+// Resume is always a deliberate click — never auto-unpause.
+function pauseIfBackgrounded() {
+  if (game?.state === "playing") game.pause();
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) pauseIfBackgrounded();
+});
+window.addEventListener("pagehide", pauseIfBackgrounded);
+
 // Gamepad: splash dismiss + title PLAY (keyboard still handled below).
 // Same physical press must not dismiss splash and immediately start a run.
 // Also keep touch chrome in sync with game state.
@@ -961,21 +1085,52 @@ function gamepadUiTick() {
       dismissSplash();
       input.blockMenuConfirmUntilRelease();
     }
-  } else if (
-    game.state === "menu" &&
-    overlay &&
-    !overlay.classList.contains("hidden")
-  ) {
-    if (overlay.classList.contains("mode-title")) {
-      if (input.consumeMenuConfirm()) onPrimaryAction();
-    } else if (
-      overlay.classList.contains("mode-path") ||
-      overlay.classList.contains("mode-brief") ||
-      overlay.classList.contains("mode-path-result")
-    ) {
-      if (input.consumeMenuConfirm()) onPathConfirm();
-    }
+    return finishGamepadTick();
   }
+
+  const overlayOn = overlay && !overlay.classList.contains("hidden");
+  input.setMenuCapture(!!overlayOn);
+  const nav = input.consumeMenuNav();
+  const back = input.consumeMenuBack();
+  const confirm = input.consumeMenuConfirm();
+
+  if (overlayOn && overlay.classList.contains("mode-title")) {
+    const els = titleTargets();
+    stepUiFocus(els, navDelta(nav));
+    if (confirm) clickFocused(els);
+  } else if (overlayOn && overlay.classList.contains("mode-path")) {
+    const step = navDelta(nav);
+    if (step) {
+      movePathFocus(step);
+      applyUiFocus(pathMapTargets(), 0);
+    }
+    if (confirm) onPathConfirm();
+    if (back) showTitleMenu();
+  } else if (overlayOn && overlay.classList.contains("mode-brief")) {
+    const els = briefTargets();
+    stepUiFocus(els, navDelta(nav));
+    if (confirm) clickFocused(els);
+    if (back) showPathMap();
+  } else if (overlayOn && overlay.classList.contains("mode-path-result")) {
+    const els = resultTargets();
+    stepUiFocus(els, navDelta(nav));
+    if (confirm) clickFocused(els);
+    if (back) showPathMap();
+  } else if (game.state === "paused" && overlayOn) {
+    const els = pauseTargets();
+    stepUiFocus(els, navDelta(nav));
+    if (confirm) clickFocused(els);
+    if (back) game.resume();
+  } else if (game.state === "gameover" && overlayOn) {
+    const els = gameoverTargets();
+    stepUiFocus(els, navDelta(nav));
+    if (confirm) clickFocused(els);
+  }
+
+  finishGamepadTick();
+}
+
+function finishGamepadTick() {
 
   const sig = `${game.state}|${preferTouchUI()}`;
   if (sig !== lastTouchState) {
@@ -1043,14 +1198,19 @@ helpBtn?.addEventListener("click", (e) => {
   e.stopPropagation();
   helpOpen = !helpOpen;
   howTo?.classList.toggle("hidden", !helpOpen);
-  helpBtn.textContent = helpOpen ? "HIDE HELP" : "HOW TO PLAY";
+  helpBtn.textContent = helpOpen ? "Hide help" : "How to play";
 });
 
 panelHelpBtn?.addEventListener("click", (e) => {
   e.stopPropagation();
   panelHelpOpen = !panelHelpOpen;
   panelHowto?.classList.toggle("hidden", !panelHelpOpen);
-  panelHelpBtn.textContent = panelHelpOpen ? "HIDE HELP" : "HOW TO PLAY";
+  panelHelpBtn.textContent = panelHelpOpen ? "Hide help" : "How to play";
+});
+
+panelMuteBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  game.toggleMute();
 });
 
 function onPathConfirm() {
@@ -1101,9 +1261,46 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Space" && e.target === document.body) e.preventDefault();
 
   if (!splashDone) return;
-  if (game.state !== "menu" && game.state !== "path_clear" && game.state !== "path_fail") return;
   if (overlay?.classList.contains("hidden")) return;
   if (e.repeat) return;
+
+  if (overlay.classList.contains("mode-gameover")) {
+    if (e.code === "ArrowRight" || e.code === "ArrowDown") {
+      e.preventDefault();
+      stepUiFocus(gameoverTargets(), 1);
+      return;
+    }
+    if (e.code === "ArrowLeft" || e.code === "ArrowUp") {
+      e.preventDefault();
+      stepUiFocus(gameoverTargets(), -1);
+      return;
+    }
+    if (e.code === "Enter" || e.code === "Space") {
+      e.preventDefault();
+      clickFocused(gameoverTargets());
+      return;
+    }
+  }
+
+  if (overlay.classList.contains("mode-panel") && game.state === "paused") {
+    if (e.code === "ArrowRight" || e.code === "ArrowDown") {
+      e.preventDefault();
+      stepUiFocus(pauseTargets(), 1);
+      return;
+    }
+    if (e.code === "ArrowLeft" || e.code === "ArrowUp") {
+      e.preventDefault();
+      stepUiFocus(pauseTargets(), -1);
+      return;
+    }
+    if (e.code === "Enter" || e.code === "Space") {
+      e.preventDefault();
+      clickFocused(pauseTargets());
+      return;
+    }
+  }
+
+  if (game.state !== "menu" && game.state !== "path_clear" && game.state !== "path_fail") return;
 
   // Path map navigation
   if (overlay.classList.contains("mode-path")) {
@@ -1140,9 +1337,19 @@ window.addEventListener("keydown", (e) => {
   }
 
   if (overlay.classList.contains("mode-brief")) {
+    if (e.code === "ArrowRight" || e.code === "ArrowDown") {
+      e.preventDefault();
+      stepUiFocus(briefTargets(), 1);
+      return;
+    }
+    if (e.code === "ArrowLeft" || e.code === "ArrowUp") {
+      e.preventDefault();
+      stepUiFocus(briefTargets(), -1);
+      return;
+    }
     if (e.code === "Enter" || e.code === "Space") {
       e.preventDefault();
-      onPathConfirm();
+      clickFocused(briefTargets());
       return;
     }
     if (e.code === "Escape") {
@@ -1153,9 +1360,19 @@ window.addEventListener("keydown", (e) => {
   }
 
   if (overlay.classList.contains("mode-path-result")) {
+    if (e.code === "ArrowRight" || e.code === "ArrowDown") {
+      e.preventDefault();
+      stepUiFocus(resultTargets(), 1);
+      return;
+    }
+    if (e.code === "ArrowLeft" || e.code === "ArrowUp") {
+      e.preventDefault();
+      stepUiFocus(resultTargets(), -1);
+      return;
+    }
     if (e.code === "Enter" || e.code === "Space") {
       e.preventDefault();
-      onPathConfirm();
+      clickFocused(resultTargets());
       return;
     }
     if (e.code === "KeyR") {
@@ -1173,8 +1390,18 @@ window.addEventListener("keydown", (e) => {
 
   if (!overlay.classList.contains("mode-title")) return;
 
+  if (e.code === "ArrowRight" || e.code === "ArrowDown") {
+    e.preventDefault();
+    stepUiFocus(titleTargets(), 1);
+    return;
+  }
+  if (e.code === "ArrowLeft" || e.code === "ArrowUp") {
+    e.preventDefault();
+    stepUiFocus(titleTargets(), -1);
+    return;
+  }
   if (e.code === "Enter" || e.code === "Space") {
     e.preventDefault();
-    onPrimaryAction();
+    clickFocused(titleTargets());
   }
 });

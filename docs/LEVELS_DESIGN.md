@@ -1,9 +1,9 @@
 # Geometry Arena — Levels Design Lock (MVP)
 
-**Status:** DESIGN LOCK (Phase A catalog)  
+**Status:** SHIPPED topologies (PR B, 2026-08-16) — `js/levels.js` is the number source of truth.  
 **Audience:** arena-topology · mode-runtime · path-ui-progress · game integration agents  
-**Last updated:** 2026-07-26  
-**Scope:** data + contracts only. No deep `game.js` rewrite in this phase.
+**Last updated:** 2026-08-16  
+**Scope:** catalog + contracts. Path levels now use the paired topologies (not all-rect).
 
 Classic **Evolved** (current endless `Game.start()` loop) remains the default PLAY path and is **never** gated by stars or Path progress.
 

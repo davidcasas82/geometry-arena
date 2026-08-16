@@ -319,7 +319,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 0;
-  max-width: min(560px, 94vw);
+  max-width: min(720px, 94vw);
   text-align: center;
 }
 
@@ -362,11 +362,11 @@ body {
 }
 
 .title-logo-geo {
-  font-size: clamp(1.5rem, 5.5vw, 3.1rem);
+  font-size: clamp(2rem, 7vw, 3.8rem);
 }
 
 .title-logo-arena {
-  font-size: clamp(1.75rem, 6.5vw, 3.6rem);
+  font-size: clamp(2.3rem, 8vw, 4.4rem);
 }
 
 .title-logo-fill {
@@ -406,13 +406,16 @@ body {
 }
 
 .title-tag {
-  margin-top: 0.7rem;
-  font-family: "Press Start 2P", monospace;
-  font-size: clamp(0.38rem, 1vw, 0.52rem);
-  letter-spacing: 0.22em;
-  color: #8ab4ff;
-  text-shadow: 0 0 8px rgba(94, 252, 255, 0.4), 1px 1px 0 #000;
-  opacity: 0.9;
+  margin-top: 1rem;
+  max-width: 28em;
+  font-family: var(--font);
+  font-size: clamp(1rem, 2.2vw, 1.25rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  color: #c8dcff;
+  text-shadow: 0 0 12px rgba(94, 252, 255, 0.35), 1px 1px 0 #000;
+  opacity: 0.95;
 }
 
 .how-to kbd {
@@ -432,22 +435,60 @@ body {
 }
 
 .title-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
   justify-content: center;
   align-items: stretch;
-  margin-top: 1.35rem;
-  width: 100%;
+  margin-top: 1.6rem;
+  width: min(560px, 100%);
 }
 
 .title-actions .btn.arcade {
   margin-top: 0;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.btn.arcade.is-focused,
+.title-help.is-focused,
+.btn.secondary.is-focused,
+.btn.is-focused {
+  outline: 3px solid #ffffff;
+  outline-offset: 3px;
+  filter: brightness(1.12);
+}
+
+.btn.arcade.stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 96px;
+  padding: 18px 16px 16px;
+}
+
+.btn.arcade .btn-main {
+  display: block;
+  font-size: clamp(0.95rem, 2.4vw, 1.15rem);
+  letter-spacing: 0.12em;
+}
+
+.btn.arcade .btn-sub {
+  display: block;
+  font-family: var(--font);
+  font-size: clamp(0.85rem, 1.8vw, 1rem);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.88;
+  font-weight: 600;
 }
 
 /* Secondary arcade sibling — magenta/cyan outline, not primary steal */
 .btn.arcade.path-cta {
-  min-width: 168px;
+  min-width: 0;
   color: #ffe8ff;
   background: linear-gradient(180deg, rgba(40, 8, 48, 0.92) 0%, rgba(18, 6, 36, 0.96) 100%);
   border: 3px solid #ff6ad5;
@@ -494,52 +535,34 @@ body {
   }
 }
 
-.title-meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 18px;
-  justify-content: center;
-  align-items: center;
-  margin-top: 0.85rem;
-}
-
-.title-best,
-.title-stars {
-  margin: 0;
-  font-family: "Press Start 2P", monospace;
-  font-size: 0.48rem;
-  letter-spacing: 0.14em;
-  color: #8ab4ff;
+.title-best {
+  margin: 1.1rem 0 0;
+  font-family: var(--font);
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #9ec0ff;
   text-shadow: 1px 1px 0 #000, 0 0 10px rgba(125, 249, 255, 0.25);
 }
 
-.title-best span,
-.title-stars span {
+.title-best span {
   color: #fff;
-}
-
-.title-stars {
-  color: #d8a0ff;
-  text-shadow: 1px 1px 0 #000, 0 0 10px rgba(200, 100, 255, 0.35);
-}
-
-.title-stars span {
-  color: #ffe566;
 }
 
 .title-help {
   appearance: none;
-  margin-top: 0.75rem;
-  padding: 6px 10px;
+  margin-top: 0.85rem;
+  padding: 8px 12px;
   border: none;
   background: transparent;
-  font-family: "Press Start 2P", monospace;
-  font-size: 0.4rem;
-  letter-spacing: 0.12em;
-  color: #6e7a9a;
+  font-family: var(--font);
+  font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #8a96b4;
   cursor: pointer;
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-underline-offset: 4px;
   transition: color 0.12s ease;
 }
 
@@ -548,10 +571,12 @@ body {
 }
 
 .title-howto {
-  margin-top: 0.75rem;
-  max-width: 380px;
+  margin-top: 0.9rem;
+  max-width: 460px;
   width: 100%;
   text-align: left;
+  font-size: 0.95rem;
+  line-height: 1.45;
   animation: title-menu-in 0.35s ease both;
 }
 
@@ -2095,8 +2120,8 @@ body.touch-ui .gameover-actions .btn.arcade {
 }
 
 .touch-bomb {
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(72px, calc(env(safe-area-inset-bottom) + 64px));
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(88px, calc(env(safe-area-inset-bottom) + 76px));
   min-width: 72px;
   min-height: 72px;
   padding: 0 14px;
@@ -2271,8 +2296,8 @@ body.touch-ui #game {
 }
 
 body.touch-ui .btn.arcade {
-  min-height: 52px;
-  min-width: 160px;
+  min-height: 88px;
+  min-width: 0;
   font-size: 1.05rem;
 }
 
@@ -2316,10 +2341,11 @@ body.touch-ui .title-menu {
   }
 
   body.touch-ui .touch-bomb {
-    right: max(10px, env(safe-area-inset-right));
-    bottom: max(12px, env(safe-area-inset-bottom));
-    min-width: 58px;
-    min-height: 58px;
+    left: max(12px, env(safe-area-inset-left));
+    right: auto;
+    bottom: max(88px, calc(env(safe-area-inset-bottom) + 76px));
+    min-width: 72px;
+    min-height: 72px;
     font-size: 0.62rem;
   }
 

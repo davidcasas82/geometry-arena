@@ -29,22 +29,42 @@ function writeJson(key, value) {
   }
 }
 
+/** Dev-only: POST to local ingest so the agent can read playtest deaths. */
+function shipPlaytest(kind, payload) {
+  if (typeof document === "undefined" || typeof document.createElement !== "function") return;
+  if (typeof fetch !== "function") return;
+  try {
+    fetch("http://127.0.0.1:5179/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, ...payload }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* ingest offline — localStorage still holds the event */
+  }
+}
+
 export function recordDeath(event) {
-  const list = readJson(DEATHS_KEY, []);
-  list.unshift({
+  const row = {
     t: Date.now(),
     ...event,
-  });
+  };
+  const list = readJson(DEATHS_KEY, []);
+  list.unshift(row);
   writeJson(DEATHS_KEY, list.slice(0, MAX_DEATHS));
+  shipPlaytest("death", row);
 }
 
 export function recordRun(run) {
-  const list = readJson(RUNS_KEY, []);
-  list.unshift({
+  const row = {
     t: Date.now(),
     ...run,
-  });
+  };
+  const list = readJson(RUNS_KEY, []);
+  list.unshift(row);
   writeJson(RUNS_KEY, list.slice(0, MAX_RUNS));
+  shipPlaytest("run", row);
   return list.slice(0, MAX_RUNS);
 }
 

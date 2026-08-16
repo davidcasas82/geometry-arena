@@ -26,3 +26,6 @@ dist/
 
 # Grok / agent session junk (if any)
 .grok/
+
+# Local playtest ingest (Step 2 death log)
+.playtest/

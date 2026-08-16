@@ -84,7 +84,7 @@ Suno-generated instrumental **Neon Swarm** (two variants):
 | `audio/neon-swarm-1.mp3` | Levels **1, 3, 5…** |
 | `audio/neon-swarm-2.mp3` | Levels **2, 4, 6…** |
 
-Levels advance every **50s** of survival (see `LEVEL_DURATION_SEC`). Tracks crossfade; mute/`M` silences SFX + BGM.
+Heat ticks every **70s** of survival (see `LEVEL_DURATION_SEC`). Tracks crossfade without restarting; mute/`M` silences SFX + BGM.
 
 ## Stack
 

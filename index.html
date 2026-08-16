@@ -115,26 +115,30 @@
             <span class="title-logo-line title-logo-geo"><span class="title-logo-fill">GEOMETRY</span></span>
             <span class="title-logo-line title-logo-arena"><span class="title-logo-fill">ARENA</span></span>
           </div>
-          <p class="title-tag">TWIN-STICK · NEON SWARM</p>
+          <p class="title-tag">Survive the swarm. Scoop gems. Chase the high score.</p>
 
           <div class="title-actions">
-            <button id="start-btn" class="btn arcade" type="button">PLAY</button>
-            <button id="path-btn" class="btn arcade path-cta" type="button">PATH</button>
+            <button id="start-btn" class="btn arcade stacked" type="button">
+              <span class="btn-main">ENDLESS</span>
+              <span class="btn-sub">One run. High score.</span>
+            </button>
+            <button id="path-btn" class="btn arcade path-cta stacked" type="button">
+              <span class="btn-main">STAGES</span>
+              <span class="btn-sub">Eight short levels.</span>
+            </button>
           </div>
-          <div class="title-meta-row">
-            <p class="title-best">BEST <span id="title-best">0</span></p>
-            <p class="title-stars" id="title-stars" title="Arena Path stars">STARS <span id="title-stars-count">0/24</span></p>
-          </div>
-          <button id="help-btn" class="title-help" type="button">HOW TO PLAY</button>
+          <p class="title-best">Best score <span id="title-best">0</span></p>
+          <button id="help-btn" class="title-help" type="button">How to play</button>
 
           <ul id="how-to" class="how-to title-howto hidden">
-            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · click-hold fire · drag to aim</li>
-            <li>Gamepad: left stick move · right stick aim · RT fire · LT bomb</li>
+            <li>Move with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>. Drag to aim. Hold click to fire.</li>
+            <li>Gamepad: left stick move · right stick aim · RT fire · LT bomb · D-pad menus</li>
             <li class="how-touch">Phone: left thumb move · right thumb aim + fire · BOMB button</li>
-            <li>Kill → green <strong>geoms</strong> → scoop for ×mult (scores explode)</li>
-            <li>Pink dashes · purple splitters · voids pull you in</li>
-            <li><kbd>Space</kbd> / A bomb clears (no points) · death soft-resets mult</li>
-            <li>Extra life · bomb milestones · <kbd>P</kbd> / Start pause</li>
+            <li>Kill shapes, then scoop the yellow gems to raise your multiplier.</li>
+            <li>Pink dashes. Purple splitters. Black holes pull you in.</li>
+            <li><kbd>Space</kbd> bomb clears the board (no points). Death cuts your multiplier.</li>
+            <li>Endless is one long run. Stages is eight short levels.</li>
+            <li><kbd>P</kbd> pauses.</li>
           </ul>
         </div>
 
@@ -148,15 +152,17 @@
             <button id="title-btn" class="btn secondary compact hidden" type="button">Title</button>
             <button id="resume-btn" class="btn secondary compact hidden" type="button">Resume</button>
           </div>
-          <button id="panel-help-btn" class="title-help panel-help hidden" type="button">HOW TO PLAY</button>
+          <button id="panel-help-btn" class="title-help panel-help hidden" type="button">How to play</button>
+          <button id="panel-mute-btn" class="title-help panel-mute hidden" type="button">SOUND ON</button>
           <ul id="panel-howto" class="how-to title-howto panel-howto hidden">
-            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · click-hold fire · drag to aim</li>
-            <li>Gamepad: left stick move · right stick aim · RT fire · LT bomb</li>
+            <li>Move with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>. Drag to aim. Hold click to fire.</li>
+            <li>Gamepad: left stick move · right stick aim · RT fire · LT bomb · D-pad menus</li>
             <li class="how-touch">Phone: left thumb move · right thumb aim + fire · BOMB button</li>
-            <li>Kill → green <strong>geoms</strong> → scoop for ×mult (scores explode)</li>
-            <li>Pink dashes · purple splitters · voids pull you in</li>
-            <li><kbd>Space</kbd> / A bomb clears (no points) · death soft-resets mult</li>
-            <li>Extra life · bomb milestones · <kbd>P</kbd> / Start pause</li>
+            <li>Kill shapes, then scoop the yellow gems to raise your multiplier.</li>
+            <li>Pink dashes. Purple splitters. Black holes pull you in.</li>
+            <li><kbd>Space</kbd> bomb clears the board (no points). Death cuts your multiplier.</li>
+            <li>Endless is one long run. Stages is eight short levels.</li>
+            <li><kbd>P</kbd> pauses.</li>
           </ul>
         </div>
 
@@ -290,7 +296,7 @@
             <button id="go-again-btn" class="btn arcade" type="button">PLAY AGAIN</button>
             <button id="go-title-btn" class="btn secondary go-title-btn" type="button">TITLE</button>
           </div>
-          <p class="gameover-hint">R · A / START RESTART</p>
+          <p class="gameover-hint">← → MOVE · A SELECT · R AGAIN</p>
         </div>
       </div>
     </main>

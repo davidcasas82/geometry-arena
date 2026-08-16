@@ -6,6 +6,7 @@
  * Fire: mouse hold / RT / RB / right virtual stick held (auto-fire).
  * Bomb: Space / B / LT / A / LB / touch bomb button.
  * Pause: P / Esc / Start / touch pause button.
+ * Menus: D-pad or left stick move focus · A/Start confirm · B back.
  *
  * Touch UI is opt-in via bindTouchControls + setTouchActive — desktop
  * mouse/keyboard paths are unchanged when touch is inactive.
@@ -17,6 +18,7 @@ import {
   GAMEPAD_FIRE_THRESHOLD,
   TOUCH_DEADZONE,
   TOUCH_STICK_RADIUS,
+  preferMobileGraphics,
 } from "./constants.js";
 
 /** Standard gamepad button indices (W3C). */
@@ -47,6 +49,14 @@ function buttonValue(pad, index) {
 function buttonPressed(pad, index) {
   const b = pad.buttons[index];
   return !!(b && b.pressed);
+}
+
+/** D-pad: some browsers expose .value without .pressed. */
+function dpadHeld(pad, index) {
+  const b = pad.buttons[index];
+  if (!b) return false;
+  if (b.pressed) return true;
+  return typeof b.value === "number" && b.value >= 0.5;
 }
 
 /**
@@ -82,6 +92,10 @@ export class Input {
     this._restartPressed = false;
     this._bombPressed = false;
     this._menuConfirmPressed = false;
+    this._menuBackPressed = false;
+    this._menuNavX = 0;
+    this._menuNavY = 0;
+    this._stickNavPrev = { x: 0, y: 0 };
 
     /** Cached gamepad move (left stick analog 0–1 mag, or D-pad unit). */
     this._gpMove = { x: 0, y: 0 };
@@ -91,6 +105,8 @@ export class Input {
     this._gpPrev = Object.create(null);
     /** True after a splash-dismiss press until all menu buttons release. */
     this._blockMenuConfirm = false;
+    /** Overlay menus own A/Start/B — do not also pause, restart, or bomb. */
+    this._menuCapture = false;
 
     /** Touch virtual sticks (only while setTouchActive(true)). */
     this.touchActive = false;
@@ -171,6 +187,8 @@ export class Input {
       this._gpMove.y = 0;
       this._gpFire = false;
       this._gpPrev = Object.create(null);
+      this._stickNavPrev.x = 0;
+      this._stickNavPrev.y = 0;
       this._resetTouchSticks();
     };
 
@@ -200,6 +218,8 @@ export class Input {
       this._gpMove.x = 0;
       this._gpMove.y = 0;
       this._gpFire = false;
+      this._stickNavPrev.x = 0;
+      this._stickNavPrev.y = 0;
       return;
     }
 
@@ -216,6 +236,8 @@ export class Input {
       this._gpMove.y = 0;
       this._gpFire = false;
       this._gpPrev = Object.create(null);
+      this._stickNavPrev.x = 0;
+      this._stickNavPrev.y = 0;
       return;
     }
 
@@ -231,12 +253,21 @@ export class Input {
     let my = leftStick.y;
 
     // D-pad is digital full-speed; wins when pressed.
+    // Some pads report D-pad via .value only, or as hat axes 6/7.
     let dpadX = 0;
     let dpadY = 0;
-    if (buttonPressed(pad, GP.LEFT)) dpadX -= 1;
-    if (buttonPressed(pad, GP.RIGHT)) dpadX += 1;
-    if (buttonPressed(pad, GP.UP)) dpadY -= 1;
-    if (buttonPressed(pad, GP.DOWN)) dpadY += 1;
+    if (dpadHeld(pad, GP.LEFT)) dpadX -= 1;
+    if (dpadHeld(pad, GP.RIGHT)) dpadX += 1;
+    if (dpadHeld(pad, GP.UP)) dpadY -= 1;
+    if (dpadHeld(pad, GP.DOWN)) dpadY += 1;
+    const hatX = pad.axes[6];
+    const hatY = pad.axes[7];
+    if (dpadX === 0 && typeof hatX === "number" && Math.abs(hatX) >= 0.5) {
+      dpadX = Math.sign(hatX);
+    }
+    if (dpadY === 0 && typeof hatY === "number" && Math.abs(hatY) >= 0.5) {
+      dpadY = Math.sign(hatY);
+    }
     if (dpadX !== 0 || dpadY !== 0) {
       const l = Math.hypot(dpadX, dpadY);
       mx = dpadX / l;
@@ -244,6 +275,25 @@ export class Input {
     }
     this._gpMove.x = mx;
     this._gpMove.y = my;
+
+    // Menu nav: D-pad, hat, or raw left-stick tilt. Edge only so hold does not spam.
+    // Use raw axes (not post-deadzone) so a firm flick always counts.
+    const NAV = 0.45;
+    let nx = 0;
+    let ny = 0;
+    if (dpadX !== 0 || dpadY !== 0) {
+      nx = Math.sign(dpadX);
+      ny = Math.sign(dpadY);
+    } else {
+      if (lx <= -NAV) nx = -1;
+      else if (lx >= NAV) nx = 1;
+      if (ly <= -NAV) ny = -1;
+      else if (ly >= NAV) ny = 1;
+    }
+    if (nx !== 0 && nx !== this._stickNavPrev.x) this._menuNavX = nx;
+    if (ny !== 0 && ny !== this._stickNavPrev.y) this._menuNavY = ny;
+    this._stickNavPrev.x = nx;
+    this._stickNavPrev.y = ny;
 
     // Right stick: absolute aim while deflected; hold last direction when centered
     const right = stickAxis(rx, ry);
@@ -281,23 +331,26 @@ export class Input {
     const lbEdge = edge(GP.LB);
     const startEdge = edge(GP.START);
     const backEdge = edge(GP.BACK);
-    edge(GP.B);
+    const bEdge = edge(GP.B);
+    if (bEdge) {
+      this._menuBackPressed = true;
+      if (!this._menuCapture) this._bombPressed = true;
+    }
     edge(GP.X);
     edge(GP.Y);
     edge(GP.RB);
     edge(GP.RT);
     edge(GP.LT);
 
-    if (aEdge || lbEdge || ltEdge) {
+    if (!this._menuCapture && (aEdge || lbEdge || ltEdge)) {
       this._bombPressed = true;
     }
-    // Face A also restarts / confirms menus; LT is bomb-only
-    if (aEdge || lbEdge) {
+    // Keyboard R / LB still quick-restart. A/Start confirm the focused control.
+    if (lbEdge) {
       this._restartPressed = true;
     }
     if (startEdge) {
-      this._pausePressed = true;
-      this._restartPressed = true;
+      if (!this._menuCapture) this._pausePressed = true;
       this._menuConfirmPressed = true;
     }
     if (aEdge) {
@@ -340,6 +393,11 @@ export class Input {
   blockMenuConfirmUntilRelease() {
     this._blockMenuConfirm = true;
     this._menuConfirmPressed = false;
+  }
+
+  /** While true, face buttons are menu nav — not bomb / pause / restart. */
+  setMenuCapture(on) {
+    this._menuCapture = !!on;
   }
 
   /**
@@ -557,13 +615,7 @@ export class Input {
   requestPointerLock() {
     // Touch / mobile: pointer lock is unnecessary and often blocked
     if (this.touchActive) return;
-    if (typeof window !== "undefined") {
-      const coarse =
-        window.matchMedia?.("(pointer: coarse)")?.matches ||
-        (navigator.maxTouchPoints || 0) > 0 &&
-          window.matchMedia?.("(max-width: 900px)")?.matches;
-      if (coarse) return;
-    }
+    if (typeof window !== "undefined" && preferMobileGraphics()) return;
     if (document.pointerLockElement === this.canvas) return;
     try {
       this.canvas.requestPointerLock?.();
@@ -600,6 +652,9 @@ export class Input {
     this._pausePressed = false;
     this._restartPressed = false;
     this._menuConfirmPressed = false;
+    this._menuBackPressed = false;
+    this._menuNavX = 0;
+    this._menuNavY = 0;
   }
 
   consumePause() {
@@ -636,6 +691,23 @@ export class Input {
     this.pollGamepad();
     const v = this._menuConfirmPressed;
     this._menuConfirmPressed = false;
+    return v;
+  }
+
+  /** D-pad / left stick edge. {x,y} each -1, 0, or 1. */
+  consumeMenuNav() {
+    this.pollGamepad();
+    const nav = { x: this._menuNavX, y: this._menuNavY };
+    this._menuNavX = 0;
+    this._menuNavY = 0;
+    return nav;
+  }
+
+  /** Face B — back / cancel on menus. */
+  consumeMenuBack() {
+    this.pollGamepad();
+    const v = this._menuBackPressed;
+    this._menuBackPressed = false;
     return v;
   }
 

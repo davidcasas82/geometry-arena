@@ -244,7 +244,7 @@ export const PATH_THEMES = Object.freeze({
  *   bestScore: Record<string, number>,
  *   bestTime?: Record<string, number>,
  *   updatedAt?: number,
- *   version: 1,
+ *   version: 1|2,
  * }} PathProgress
  *
  * @typedef {{
@@ -296,7 +296,7 @@ export const LEVELS = [
     chapter: 1,
     order: 2,
     mode: MODE.DEADLINE,
-    arena: { topology: TOPOLOGY.RECT },
+    arena: { topology: TOPOLOGY.RECT_TIGHT, params: { width: 1100, height: 700 } },
     rules: {
       // ~45s sprint: 8k was ~seconds of play. Target needs sustained mult.
       durationSec: 60,
@@ -323,7 +323,7 @@ export const LEVELS = [
     chapter: 1,
     order: 3,
     mode: MODE.WAVES,
-    arena: { topology: TOPOLOGY.RECT },
+    arena: { topology: TOPOLOGY.CORRIDOR, params: { axis: "x", halfWidth: 168 } },
     rules: {
       lives: 3,
       bombs: 3,
@@ -391,7 +391,7 @@ export const LEVELS = [
     chapter: 1,
     order: 4,
     mode: MODE.CHECKPOINT,
-    arena: { topology: TOPOLOGY.RECT },
+    arena: { topology: TOPOLOGY.CROSS, params: { armHalfWidth: 180 } },
     rules: {
       lives: 3,
       bombs: 3,
@@ -439,19 +439,19 @@ export const LEVELS = [
   },
   {
     id: "path-05-donut-orbit",
-    name: "Pressure Orbit",
-    tagline: "Survive longer as density and threats ramp hard.",
+    name: "Donut Orbit",
+    tagline: "Survive the ring. The hole is death.",
     chapter: 2,
     order: 5,
     mode: MODE.EVOLVED,
-    arena: { topology: TOPOLOGY.RECT },
+    arena: { topology: TOPOLOGY.DONUT, params: { innerR: 150, outerMargin: 40 } },
     rules: {
       durationSec: 90,
       lives: 3,
       bombs: 3,
       safeOpeningSec: 10,
       spawnRampSec: 70,
-      softCap: 30,
+      softCap: 22,
       enemyUnlockScale: 0.95,
       bgm: 1,
       themeId: "donut-orbit",
@@ -460,7 +460,7 @@ export const LEVELS = [
       score: [200000, 450000],
       peakMult: [35, 70],
     },
-    skillLesson: "Keep moving, bank mult, respect late-game voids and snakes.",
+    skillLesson: "Orbit the hole; never hug the inner wall blind.",
   },
   {
     id: "path-06-split-signal",
@@ -469,7 +469,7 @@ export const LEVELS = [
     chapter: 2,
     order: 6,
     mode: MODE.WAVES,
-    arena: { topology: TOPOLOGY.RECT },
+    arena: { topology: TOPOLOGY.SPLIT, params: { gap: 160, wallThickness: 48, axis: "y" } },
     rules: {
       lives: 3,
       bombs: 2,
@@ -544,7 +544,7 @@ export const LEVELS = [
     chapter: 2,
     order: 7,
     mode: MODE.DEADLINE,
-    arena: { topology: TOPOLOGY.RECT },
+    arena: { topology: TOPOLOGY.WRAP_TORUS },
     rules: {
       durationSec: 75,
       targetScore: 250000,
@@ -570,31 +570,30 @@ export const LEVELS = [
     chapter: 2,
     order: 8,
     mode: MODE.BOSS_LITE,
-    arena: { topology: TOPOLOGY.RECT },
+    arena: { topology: TOPOLOGY.RECT_WIDE, params: { width: 1520, height: 600 } },
     rules: {
       durationSec: 120,
       lives: 3,
       bombs: 3,
-      safeOpeningSec: 2,
+      safeOpeningSec: 1.2,
       bgm: 2,
       themeId: "boss-pulse",
       boss: {
         type: "tank",
-        hp: 14,
-        score: 2500,
+        hp: 28,
+        score: 12000,
         spawn: { x: 800, y: 200 },
         label: "PULSE TANK",
         clearAdds: true,
         adds: {
-          everySec: 6,
+          everySec: 4,
           types: ["wanderer", "diamond"],
-          count: 5,
+          count: 6,
           pattern: SPAWN_PATTERN.EDGE_LINE,
         },
       },
     },
     stars: {
-      score: [150000, 350000],
       livesLeft: [1, 2],
       timeSecMax: [90, 60],
     },
@@ -703,8 +702,43 @@ export function normalizeProgress(progress) {
     bestTime:
       p.bestTime && typeof p.bestTime === "object" ? { ...p.bestTime } : {},
     updatedAt: p.updatedAt,
-    version: 1,
+    version: p.version === 2 ? 2 : 1,
   };
+}
+
+/** Short badge for Path map / brief. */
+export function topologyLabel(id) {
+  switch (id) {
+    case TOPOLOGY.RECT:
+    case "rect":
+      return "RECT";
+    case TOPOLOGY.RECT_TIGHT:
+    case "rect_tight":
+      return "TIGHT";
+    case TOPOLOGY.RECT_WIDE:
+    case "rect_wide":
+      return "WIDE";
+    case TOPOLOGY.DONUT:
+    case "donut":
+      return "DONUT";
+    case TOPOLOGY.CORRIDOR:
+    case "corridor":
+      return "LANE";
+    case TOPOLOGY.CROSS:
+    case "cross":
+      return "CROSS";
+    case TOPOLOGY.PILL_2D:
+    case "pill_2d":
+      return "PILL";
+    case TOPOLOGY.WRAP_TORUS:
+    case "wrap_torus":
+      return "WRAP";
+    case TOPOLOGY.SPLIT:
+    case "split":
+      return "SPLIT";
+    default:
+      return String(id || "ARENA").toUpperCase();
+  }
 }
 
 /**
@@ -802,6 +836,66 @@ export function computeStars(levelOrId, score, extra = { cleared: false }) {
   // (Absent optional extras are skipped above; score always counts if configured.)
   const grade = Math.min(...tiers);
   return /** @type {0|1|2|3} */ (Math.max(1, Math.min(3, grade)));
+}
+
+function fmtScore(n) {
+  return Math.round(Number(n) || 0).toLocaleString("en-US");
+}
+
+/**
+ * One line: why this grade, or what the next star needs.
+ * @param {LevelDef | string | null} levelOrId
+ * @param {number} score
+ * @param {LevelResultExtra} [extra]
+ * @param {number} [stars]
+ */
+export function describeStarGap(levelOrId, score, extra = {}, stars = null) {
+  const level =
+    typeof levelOrId === "string" ? getLevel(levelOrId) : levelOrId;
+  if (!level) return "";
+  const grade =
+    stars != null ? stars : computeStars(level, score, extra);
+  if (!extra?.cleared || grade <= 0) return "CLEAR TO UNLOCK STARS";
+  if (grade >= 3) return "★★★ MASTERED";
+
+  const s = level.stars || {};
+  const want = grade + 1;
+  const idx = want === 3 ? 1 : 0;
+  const bits = [];
+
+  if (s.score) {
+    const need = s.score[idx];
+    const have = Number(score) || 0;
+    if (have < need) bits.push(`SCORE ${fmtScore(have)}/${fmtScore(need)}`);
+  }
+  if (s.peakMult && extra.peakMult != null) {
+    const need = s.peakMult[idx];
+    const have = Number(extra.peakMult) || 0;
+    if (have < need) bits.push(`NEED ×${need}`);
+  }
+  if (s.timeLeftSec && extra.timeLeftSec != null) {
+    const need = s.timeLeftSec[idx];
+    const have = Number(extra.timeLeftSec) || 0;
+    if (have < need) bits.push(`NEED ${need}s LEFT`);
+  }
+  if (s.timeSecMax && extra.elapsedSec != null) {
+    const need = s.timeSecMax[idx];
+    const have = Number(extra.elapsedSec) || 0;
+    if (have > need) bits.push(`FINISH BY ${need}s`);
+  }
+  if (s.onTimeGates && extra.onTimeGates != null) {
+    const need = s.onTimeGates[idx];
+    const have = Number(extra.onTimeGates) || 0;
+    if (have < need) bits.push(`ON-TIME GATES ${have}/${need}`);
+  }
+  if (s.livesLeft && extra.livesLeft != null) {
+    const need = s.livesLeft[idx];
+    const have = Number(extra.livesLeft) || 0;
+    if (have < need) bits.push(`KEEP ${need} LIVES`);
+  }
+
+  if (!bits.length) return `★${grade}  NEXT ★${want}`;
+  return `★${grade}  ${bits.join(" · ")}`;
 }
 
 /**

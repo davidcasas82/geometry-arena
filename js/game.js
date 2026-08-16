@@ -107,6 +107,7 @@ import {
   drawGeoms,
   drawGrid,
   drawPlayer,
+  drawCheckpoints,
   enemyIsOutline,
 } from "./render.js";
 import {
@@ -347,7 +348,7 @@ export class Game {
     };
   }
 
-start() {
+start(opts = {}) {
     // Classic Evolved endless — never gated by Path
     this._clearPathRuntime();
     this.shell = "classic";
@@ -401,8 +402,9 @@ start() {
     this.state = "playing";
     this.audio.ensure();
     this.audio.start();
-    // Level 1 → Neon Swarm variant 1
-    this.audio.playLevelTheme(1, { restart: true });
+    if (!opts.skipBgm) {
+      this.audio.playLevelTheme(1, { restart: true });
+    }
     this.ui.hideOverlay();
     this.ui.updateScore(0);
     this.ui.updateMult(1);
@@ -440,6 +442,8 @@ this.modeFlags = new Set();
     this.pathBossKilled = false;
     this._pathBossSeen = false;
     this.pathOnTimeGates = 0;
+    this.pathCheckpoints = null;
+    this.pathCheckpointIndex = 0;
     this.pathSoftCap = null;
     this.pathSpawnRampSec = null;
     this.pathSafeOpeningSec = null;
@@ -556,7 +560,7 @@ this.modeFlags = new Set();
           COLORS.danger,
           1.35
         );
-        this._playerHit();
+        this._playerHit("CRUSHED");
       }
     }
 
@@ -614,7 +618,7 @@ this.modeFlags = new Set();
     }
 
     // Shared run reset via classic start, then overlay Path config
-    this.start();
+    this.start({ skipBgm: true });
     this.shell = "path";
     this.pathLevel = level;
     this.pathEnding = false;
@@ -660,20 +664,7 @@ this.modeFlags = new Set();
     this.ui.updateObjective?.("");
     this.ui.updateTimer?.("");
 
-    // BGM: prefer Path theme meta; play classic Neon Swarm fallback until assets land
-    // TODO(audio): audio.playTheme(theme) when path mp3s exist
-    const theme = getLevelTheme(level);
-    const track =
-      theme?.fallback === 2
-        ? 2
-        : theme?.fallback === 1
-          ? 1
-          : level.rules?.bgm === 2
-            ? 2
-            : level.order % 2 === 0
-              ? 2
-              : 1;
-    this.audio.playLevelTheme(track, { restart: true });
+    this.audio.playTheme(getLevelTheme(level), { restart: true });
 
     const ctx = this._modeContext();
     this.mode.onEnter(ctx);
@@ -878,20 +869,19 @@ this.modeFlags = new Set();
     this.levelTimer = 0;
     this.ui.updateLevel?.(this.level);
     this.audio.levelUp();
-    // Odd levels → track 1, even → track 2 (both Suno variants)
-    this.audio.playLevelTheme(this.level, { restart: true });
+    // Same run — keep the bed playing. Restarting every 50s felt like a new stage.
+    this.audio.playLevelTheme(this.level, { restart: false });
     this.particles.floater(
       this.player.x,
       this.player.y - 36,
-      `LEVEL ${this.level}`,
+      `HEAT ${this.level}`,
       COLORS.player,
       1.35
     );
     addTrauma(this.cam, 0.16, { big: true });
     punchZoom(this.cam, 0.04);
     this._gridPulse(this.player.x, this.player.y, 1.6);
-    // Brief mercy + spawn pressure bump
-    this.player.invuln = Math.max(this.player.invuln, 500);
+    // Tiny spawn poke only — do not grant mercy invuln (that reads as a reset)
     this.spawnTimer = Math.min(this.spawnTimer, 0.15);
   }
 
@@ -1515,15 +1505,24 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     this.particles.burst(this.player.x, this.player.y, COLORS.bomb, 40, 440);
     this.particles.burst(this.player.x, this.player.y, "#ffffff", 36, 400);
 
-    let bombedBoss = null;
     for (const e of this.enemies) {
-      if (e.pathBoss || e.boss) bombedBoss = e;
+      if (e.pathBoss || e.boss) {
+        // Insurance, not a win button — chip the elite, clear the fodder.
+        e.hp = Math.max(0, (e.hp || 1) - 5);
+        this.particles.burst(e.x, e.y, e.color, 28, 340);
+        this.particles.ring(e.x, e.y, e.color, 22, 280);
+        if (e.hp <= 0) {
+          e.dead = true;
+          this._onKill(e, { fromBomb: true });
+        }
+        continue;
+      }
       e.dead = true;
       this.particles.burst(e.x, e.y, e.color, 22, 300);
       this.particles.ring(e.x, e.y, e.color, 12, 220);
       this._gridPulse(e.x, e.y, 1.0);
     }
-    this.enemies = [];
+    this.enemies = this.enemies.filter((e) => !e.dead);
     this.bullets = [];
     this.player.invuln = Math.max(this.player.invuln, 700);
     this.boardWasPopulated = false; // bomb clear doesn't count as skill clear
@@ -1535,14 +1534,7 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
       this.spawnQueue = (this.spawnQueue || []).filter((j) => j.pathScripted || j.boss);
     }
     this.spawnTimer = Math.max(this.spawnTimer, 0.8);
-
-    if (bombedBoss) {
-      this.pathBossAlive = false;
-      this.pathBossKilled = true;
-      if (this.pathLevel && this.mode?.onEnemyKilled) {
-        this.mode.onEnemyKilled(this._modeContext(), bombedBoss);
-      }
-    }
+    // Boss kill notify lives in _onKill (called above if the chip finished it).
 
     // Peak strategic fun: bomb protects a high mult — celebrate it
     if (savedMult >= 10) {
@@ -1678,15 +1670,71 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
   }
 
   /**
+   * Snapshot why this death happened *before* mercy teleport.
+   * `cause` is CRUSHED | enemy type | contact. `offscreen` is extra context
+   * for cover-crop / zoom (does not replace the cause).
+   * @param {string|null} [hint]
+   */
+  _snapshotDeath(hint = null) {
+    const cause =
+      hint === "CRUSHED"
+        ? "CRUSHED"
+        : hint || this._touchingEnemyType() || "contact";
+    return {
+      cause,
+      offscreen: this._isWorldPointOffscreen(this.player.x, this.player.y),
+      arena: this.arena?.topology || "rect",
+      morphWarn: !!this.morphWarn,
+      x: Math.round(this.player.x),
+      y: Math.round(this.player.y),
+    };
+  }
+
+  /** Enemy currently overlapping the ship, if any. */
+  _touchingEnemyType() {
+    for (const e of this.enemies) {
+      if (this._enemyHitPlayer(e)) return e.type || "contact";
+    }
+    return null;
+  }
+
+  /**
+   * True when a world point is outside the on-screen camera frame.
+   * Desktop letterbox is fully visible; this mainly flags phone cover-crop.
+   */
+  _isWorldPointOffscreen(x, y) {
+    const cam = this.cam;
+    if (!cam) return false;
+    const visX = this.display?.visFracX ?? 1;
+    const visY = this.display?.visFracY ?? 1;
+    if (visX >= 0.98 && visY >= 0.98) return false;
+    const z = Math.max(0.5, cam.zoom || 1);
+    const ww = this.world?.w || WORLD_W;
+    const wh = this.world?.h || WORLD_H;
+    const halfW = (ww / (2 * z)) * visX;
+    const halfH = (wh / (2 * z)) * visY;
+    const cx = cam.x ?? ww / 2;
+    const cy = cam.y ?? wh / 2;
+    return (
+      x < cx - halfW ||
+      x > cx + halfW ||
+      y < cy - halfH ||
+      y > cy + halfH
+    );
+  }
+
+  /**
    * Death → safe-pocket respawn with mercy package:
    * 1) Choose safest open area (center if it’s clear)
    * 2) Death blast clears a wide radius there + soft board cull
    * 3) Remaining enemies are shoved outward
    * 4) Control freeze (blink, no input) then invuln with control restored
    * 5) Soft mult retain (recovery seed) — not hard reset to ×1
+   * @param {string|null} [causeHint] CRUSHED | enemy type from the hit loop
    */
-  _playerHit() {
+  _playerHit(causeHint = null) {
     if (this.player.invuln > 0) return;
+    const deathMeta = this._snapshotDeath(causeHint);
     this.lives -= 1;
     this.ui.updateLives(this.lives);
 
@@ -1786,8 +1834,14 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
       score: this.score,
       enemies: this.enemies.length,
       deathNum: this.deathCount,
+      cause: deathMeta.cause,
+      offscreen: deathMeta.offscreen,
+      arena: deathMeta.arena,
+      morphWarn: deathMeta.morphWarn,
+      x: deathMeta.x,
+      y: deathMeta.y,
     };
-    // Tuning telemetry — median death target 90–150s
+    // Tuning telemetry — median death target 90–150s. Read `cause` for Step 2.
     console.info("[arena:death]", deathEvent);
     recordDeath(deathEvent);
 
@@ -2025,7 +2079,7 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     if (this.player.invuln <= 0) {
       for (const e of this.enemies) {
         if (this._enemyHitPlayer(e)) {
-          this._playerHit();
+          this._playerHit(e.type || "contact");
           break;
         }
       }
@@ -2060,6 +2114,14 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     // Floor environment first…
     drawGrid(wctx, 0, 0, this.gridImpulses, this.time, ww, wh, pulse);
     if (this.arena) drawArena(wctx, this.arena, { time: this.time, cam: this.cam });
+    if (this.pathLevel && this.pathCheckpoints) {
+      drawCheckpoints(
+        wctx,
+        this.pathCheckpoints,
+        this.pathCheckpointIndex || 0,
+        this.time
+      );
+    }
     // Morph danger telegraph (red zones about to become solid)
     if (
       this.morphWarn &&
@@ -2206,6 +2268,7 @@ _draw() {
       this._update(dt);
     } else {
       if (this.input.consumeMute()) this.toggleMute();
+      // Keyboard R / LB quick-restart. A/Start confirm the focused overlay button.
       if (this.state === "gameover" && this.input.consumeRestart()) {
         this.start();
       }
@@ -2217,7 +2280,7 @@ _draw() {
         const id = this.pathLevel.id;
         this.startLevel(id);
       }
-if (this.state === "menu") {
+      if (this.state === "menu") {
         this.time += dt;
         this.player.angle += dt * 0.85;
         this.particles.update(dt * 0.5);

@@ -154,6 +154,7 @@ const {
 // re-export used in new test
 const { Game } = await import(js("game.js"));
 const { spawnEnemy } = await import(js("entities.js"));
+const { getRecentDeaths } = await import(js("runs.js"));
 
 function mockUi() {
   return {
@@ -306,6 +307,45 @@ test("three hits with expired invuln leads to game over", () => {
 
 test("RESPAWN_INVULN_MS is finite and under 4 seconds", () => {
   assert.ok(RESPAWN_INVULN_MS > 500 && RESPAWN_INVULN_MS < 4000);
+});
+
+test("contact death records enemy type as cause before mercy teleport", () => {
+  const g = makeGame();
+  g.lives = 3;
+  g.player.invuln = 0;
+  g.player.x = WORLD_W / 2;
+  g.player.y = WORLD_H / 2;
+  const e = spawnEnemy("pink", 60);
+  e.x = g.player.x;
+  e.y = g.player.y;
+  e.enter = 1;
+  e.approachTime = 0;
+  e.approach = null;
+  g.enemies = [e];
+  g._playerHit("pink");
+  const last = getRecentDeaths(1)[0];
+  assert.ok(last, "expected a recorded death");
+  assert.equal(last.cause, "pink");
+  assert.equal(last.offscreen, false);
+  assert.equal(typeof last.x, "number");
+  assert.equal(typeof last.y, "number");
+});
+
+test("morph crush death records CRUSHED, not the nearby enemy", () => {
+  const g = makeGame();
+  g.lives = 3;
+  g.player.invuln = 0;
+  const e = spawnEnemy("wanderer", 60);
+  e.x = g.player.x;
+  e.y = g.player.y;
+  e.enter = 1;
+  e.approachTime = 0;
+  e.approach = null;
+  g.enemies = [e];
+  g._playerHit("CRUSHED");
+  const last = getRecentDeaths(1)[0];
+  assert.ok(last, "expected a recorded death");
+  assert.equal(last.cause, "CRUSHED");
 });
 
 test("source: game loop must not re-extend invuln on overlap", async () => {

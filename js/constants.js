@@ -107,20 +107,20 @@ export const PHRASE = {
   /** Gap between multi-beat phrase halves (seconds) */
   BEAT_GAP: 0.55,
   /** Player-circle ambush */
-  CIRCLE_MIN_ELAPSED: 55,
-  CIRCLE_COOLDOWN: 28,
+  CIRCLE_MIN_ELAPSED: 95,
+  CIRCLE_COOLDOWN: 36,
   CIRCLE_RADIUS: 165,
   CIRCLE_COUNT_MIN: 8,
   CIRCLE_COUNT_MAX: 14,
   /** 4-corner flood (jacks-like path cut) */
-  FLOOD_MIN_ELAPSED: 70,
+  FLOOD_MIN_ELAPSED: 100,
   FLOOD_COOLDOWN: 32,
   FLOOD_PER_CORNER: 4,
   /** Min distance from player for any job spawn point */
   SAFE_SPAWN_DIST: 110,
   /** Lull multipliers by phrase intensity tag */
   LULL_SCALE: {
-    soft: 0.85,
+    soft: 1.2,
     normal: 1,
     hard: 1.35,
     setpiece: 1.55,
@@ -132,7 +132,7 @@ export const PHRASE = {
  * Tuned so mid-game (45–90s) has teeth without becoming soup.
  */
 export const SOFT_CAP = {
-  opening: 7, // < SAFE_OPENING_SEC
+  opening: 9, // < SAFE_OPENING_SEC
   early: 14, // < 50s
   mid: 26, // < 100s
   late: 40, // < 150s
@@ -405,11 +405,11 @@ applyGfxQuality(resolveGfxQuality());
 export const MORPH = {
   ENABLED_CLASSIC: true,
   /** First morph warn starts after this many seconds of a Classic run */
-  FIRST_AT: 18,
+  FIRST_AT: 48,
   /** Seconds between morph commits (warn is inside this window) */
-  INTERVAL: 12,
+  INTERVAL: 22,
   /** Red flash warning before topology locks */
-  WARN_SEC: 2.0,
+  WARN_SEC: 2.6,
   /** Cycle of arena refs (wraps). Keep shapes fair on laptop. */
   SHAPES: [
     { topology: "rect" },
@@ -572,8 +572,8 @@ export const SPAWN_TABLE = [
 
 export const HS_KEY = "geometry-arena-highscore";
 
-/** Level / BGM cadence (~50s → track swap near mid-run) */
-export const LEVEL_DURATION_SEC = 50;
+/** Heat / BGM cadence (unstick from ~50s pincer intro) */
+export const LEVEL_DURATION_SEC = 70;
 export const BGM_TRACKS = [
   "audio/neon-swarm-1.mp3",
   "audio/neon-swarm-2.mp3",

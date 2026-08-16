@@ -388,6 +388,8 @@ function checkpointController() {
         ctx.game.pathAllowImprov = true;
         ctx.game.pathScriptOnly = false;
         ctx.game.pathOnTimeGates = 0;
+        ctx.game.pathCheckpoints = cps;
+        ctx.game.pathCheckpointIndex = 0;
       }
     },
     /** @param {ModeContext} ctx */
@@ -398,11 +400,9 @@ function checkpointController() {
         return;
       }
       if (globalFail != null && ctx.elapsed >= globalFail && index < cps.length) {
-        if (failOnMiss) {
-          state = "lost";
-          ctx.flags.add("timeout");
-          return;
-        }
+        state = "lost";
+        ctx.flags.add("timeout");
+        return;
       }
 
       while (index < cps.length) {
@@ -414,9 +414,13 @@ function checkpointController() {
           const dy = ctx.game.player.y - zone.y;
           const rr = zone.r || 40;
           if (dx * dx + dy * dy <= rr * rr) hit = true;
-        }
-        if (!hit && ctx.elapsed >= cp.dueSec) {
+        } else if (!zone && ctx.elapsed >= cp.dueSec) {
+          // Authored marker with no world zone — complete on the clock.
           hit = true;
+        } else if (failOnMiss && zone && ctx.elapsed >= cp.dueSec) {
+          state = "lost";
+          ctx.flags.add("missed-gate");
+          return;
         }
 
         if (!hit) break;
@@ -424,7 +428,10 @@ function checkpointController() {
         const onTimeHit = ctx.elapsed <= cp.dueSec + 0.05;
         if (onTimeHit) onTime += 1;
         ctx.flags.add(cp.id);
-        if (ctx.game) ctx.game.pathOnTimeGates = onTime;
+        if (ctx.game) {
+          ctx.game.pathOnTimeGates = onTime;
+          ctx.game.pathCheckpointIndex = index + 1;
+        }
 
         if (ctx.game?.particles?.floater && ctx.game.player) {
           const label = cp.label || `GATE ${index + 1}`;
@@ -466,9 +473,14 @@ function checkpointController() {
     getHud(ctx) {
       const total = cps.length || 1;
       const next = cps[index];
+      const due = next?.dueSec != null ? Math.max(0, next.dueSec - ctx.elapsed) : 0;
+      const name = next?.label || `GATE ${index + 1}`;
       return {
         timer: formatClock(ctx.elapsed),
-        objective: `GATE ${Math.min(index, total)}/${total}`,
+        objective:
+          index >= cps.length
+            ? `GATE ${total}/${total}`
+            : `${name} ${formatClock(due)}`,
         wave: next?.label ? next.label : undefined,
         label: ctx.level?.name || "CHECKPOINT",
       };

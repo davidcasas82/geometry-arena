@@ -1022,6 +1022,44 @@ export function drawVignette(ctx) {
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 }
 
+/** Path Cross Gates — pulsing rings. Next gate is brighter. */
+export function drawCheckpoints(ctx, checkpoints, nextIndex, time = 0) {
+  if (!checkpoints || !checkpoints.length) return;
+  const t = time || 0;
+  for (let i = 0; i < checkpoints.length; i++) {
+    const cp = checkpoints[i];
+    const zone = cp?.zone;
+    if (!zone) continue;
+    const done = i < nextIndex;
+    const next = i === nextIndex;
+    const pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * (next ? 6 : 3) + i));
+    const a = done ? 0.22 : next ? 0.55 + 0.35 * pulse : 0.28;
+    const col = done ? "#5efcff" : COLORS.danger;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, zone.r || 70, 0, Math.PI * 2);
+    ctx.strokeStyle = colorWithAlpha(col, a);
+    ctx.lineWidth = next ? 3.4 : 1.8;
+    ctx.setLineDash(done ? [4, 8] : [10, 8]);
+    ctx.lineDashOffset = -t * (next ? 40 : 18);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(zone.x, zone.y, 4 + (next ? pulse * 3 : 0), 0, Math.PI * 2);
+    ctx.fillStyle = colorWithAlpha(col, a);
+    ctx.fill();
+    if (cp.label && next) {
+      ctx.font = "10px \"Press Start 2P\", monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = colorWithAlpha("#fff", 0.85);
+      ctx.fillText(cp.label, zone.x, zone.y - (zone.r || 70) - 8);
+    }
+    ctx.restore();
+  }
+}
+
 export function drawAimReticle(ctx, rx, ry, shipX, shipY) {
   const hy = hoverY(shipY);
   const hry = hoverY(ry, 2);

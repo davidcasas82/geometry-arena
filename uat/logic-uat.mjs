@@ -441,11 +441,165 @@ test("combat sim: hold fire kills nearby wanderer", () => {
   assert.equal(kills, 1, "should kill one wanderer while holding fire");
 });
 
+test("Path catalog uses authored topologies, not all rect", async () => {
+  const { LEVELS } = await import(js("levels.js"));
+  const byId = Object.fromEntries(LEVELS.map((l) => [l.id, l.arena.topology]));
+  assert.equal(byId["path-01-grid-wake"], "rect");
+  assert.equal(byId["path-02-deadline-drill"], "rect_tight");
+  assert.equal(byId["path-03-wave-lane"], "corridor");
+  assert.equal(byId["path-04-cross-gates"], "cross");
+  assert.equal(byId["path-05-donut-orbit"], "donut");
+  assert.equal(byId["path-06-split-signal"], "split");
+  assert.equal(byId["path-07-torus-rush"], "wrap_torus");
+  assert.equal(byId["path-08-boss-pulse"], "rect_wide");
+});
+
+test("AFK does not auto-complete Cross Gates", async () => {
+  const { getLevel } = await import(js("levels.js"));
+  const { createModeController } = await import(js("modes.js"));
+  const level = getLevel("path-04-cross-gates");
+  const mode = createModeController(level.mode);
+  const game = {
+    player: { x: 10, y: 10 },
+    score: 0,
+    lives: 3,
+    elapsed: 0,
+    enemies: [],
+    spawnQueue: [],
+  };
+  const ctx = {
+    game,
+    level,
+    arena: { topology: "cross" },
+    elapsed: 0,
+    durationLeft: 95,
+    flags: new Set(),
+  };
+  mode.onEnter(ctx);
+  ctx.elapsed = 80;
+  mode.onUpdate(ctx, 1);
+  assert.equal(mode.getState(ctx), "playing", "sitting still must not clear gates");
+  assert.equal(game.pathOnTimeGates, 0);
+  ctx.elapsed = 96;
+  mode.onUpdate(ctx, 1);
+  assert.equal(mode.getState(ctx), "lost", "timeout with gates remaining is a fail");
+});
+
+test("visiting Cross Gates zones in order wins", async () => {
+  const { getLevel } = await import(js("levels.js"));
+  const { createModeController } = await import(js("modes.js"));
+  const level = getLevel("path-04-cross-gates");
+  const mode = createModeController(level.mode);
+  const game = {
+    player: { x: 800, y: 450 },
+    score: 0,
+    lives: 3,
+    enemies: [],
+    spawnQueue: [],
+    _addScore() {},
+  };
+  const ctx = {
+    game,
+    level,
+    arena: { topology: "cross" },
+    elapsed: 1,
+    durationLeft: 94,
+    flags: new Set(),
+  };
+  mode.onEnter(ctx);
+  for (const cp of level.rules.checkpoints) {
+    game.player.x = cp.zone.x;
+    game.player.y = cp.zone.y;
+    ctx.elapsed = cp.dueSec - 1;
+    mode.onUpdate(ctx, 0.1);
+  }
+  assert.equal(mode.getState(ctx), "won");
+  assert.equal(game.pathOnTimeGates, 4);
+});
+
+test("star gap names the missing family", async () => {
+  const { getLevel, computeStars, describeStarGap } = await import(js("levels.js"));
+  const level = getLevel("path-01-grid-wake");
+  const extra = { cleared: true, peakMult: 8 };
+  const stars = computeStars(level, 90000, extra);
+  assert.equal(stars, 1, "peakMult 8 blocks 2★ even if score clears 80k");
+  const gap = describeStarGap(level, 90000, extra, stars);
+  assert.ok(/NEED ×20/.test(gap), gap);
+});
+
 function makeInputWithKeys(codes) {
   const input = new Input(new FakeCanvas());
   for (const c of codes) input.keys.add(c);
   return input;
 }
+
+function fakePad({ buttons = {}, axes = [0, 0, 0, 0] } = {}) {
+  const list = Array.from({ length: 16 }, (_, i) => {
+    const v = buttons[i] ? 1 : 0;
+    return { pressed: v > 0, value: v };
+  });
+  return { buttons: list, axes: axes.slice() };
+}
+
+function withGamepad(pad, fn) {
+  if (!globalThis.navigator) {
+    Object.defineProperty(globalThis, "navigator", {
+      value: {},
+      configurable: true,
+      writable: true,
+    });
+  }
+  const nav = globalThis.navigator;
+  const had = Object.prototype.hasOwnProperty.call(nav, "getGamepads");
+  const prev = nav.getGamepads;
+  nav.getGamepads = () => [pad];
+  try {
+    return fn();
+  } finally {
+    if (had) nav.getGamepads = prev;
+    else delete nav.getGamepads;
+  }
+}
+
+test("D-pad right/left emit one menu-nav edge each press", () => {
+  const input = new Input(new FakeCanvas());
+  const pad = fakePad({ buttons: { 15: true } }); // RIGHT
+  withGamepad(pad, () => {
+    const a = input.consumeMenuNav();
+    assert.equal(a.x, 1);
+    assert.equal(a.y, 0);
+    const held = input.consumeMenuNav();
+    assert.equal(held.x, 0, "hold must not spam");
+  });
+  pad.buttons[15] = { pressed: false, value: 0 };
+  withGamepad(pad, () => input.consumeMenuNav());
+  pad.buttons[14] = { pressed: true, value: 1 }; // LEFT
+  withGamepad(pad, () => {
+    const b = input.consumeMenuNav();
+    assert.equal(b.x, -1);
+  });
+});
+
+test("left stick tilt emits menu-nav from raw axes", () => {
+  const input = new Input(new FakeCanvas());
+  const pad = fakePad({ axes: [0.7, 0, 0, 0] });
+  withGamepad(pad, () => {
+    const a = input.consumeMenuNav();
+    assert.equal(a.x, 1);
+    const held = input.consumeMenuNav();
+    assert.equal(held.x, 0);
+  });
+});
+
+test("menu capture keeps A from bombing", () => {
+  const input = new Input(new FakeCanvas());
+  input.setMenuCapture(true);
+  const pad = fakePad({ buttons: { 0: true } }); // A
+  withGamepad(pad, () => {
+    assert.equal(input.consumeMenuConfirm(), true);
+    assert.equal(input.consumeBomb(), false);
+  });
+});
 
 const failed = results.filter((r) => !r.ok);
 console.log(`\n=== Results: ${results.length - failed.length}/${results.length} passed ===\n`);

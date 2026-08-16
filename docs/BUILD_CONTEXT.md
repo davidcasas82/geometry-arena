@@ -60,11 +60,12 @@ ES modules require a static server (`file://` will fail).
 __geometryArena          // Game instance
 __arenaRuns()            // dump run history
 __arenaRecent()          // last 10 runs
+__arenaDeaths()          // last 20 deaths (includes `cause`)
 ```
 
 Run history is in `localStorage` (this browser only). Agent sessions cannot see the user’s prior runs unless they’re in the same browser profile.
 
-Death telemetry logs: `[arena:death]` in the console.
+Death telemetry logs: `[arena:death]` in the console. Each event includes `cause` (`CRUSHED` or enemy type), `offscreen`, `arena`, `morphWarn`, and death `x`/`y` (snapshotted before mercy teleport).
 
 ---
 
@@ -195,7 +196,7 @@ Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu stil
 - **Logo:** Orbitron blackletter-style chrome gradients + extruded text-shadow; Press Start 2P for prompts/buttons
 - **Entities:** hover height + ground shadow for “above the grid” read
 - **Spawn telegraph (Sektori):** enemies enter as thick red outline wireframes (`enter < GFX.ENEMY_OUTLINE_END`, ~450ms) — no collision until solidify; then fill + neon
-- **Classic arena morph:** `MORPH` in constants — cycles topologies every ~12s after 18s with 2s red danger telegraph (`drawMorphDanger`); trap outside next shape = death (CRUSHED). Path levels static.
+- **Classic arena morph:** `MORPH` in constants — first warn ~48s, then every ~22s, 2.6s red danger telegraph (`drawMorphDanger`); trap outside next shape = death (CRUSHED). Path levels static.
 - **Camera:** trauma shake with combat soft-cap + diminishing returns (dense kills don’t pin full earthquake); big events use `{ big: true }`; zoom punch on set pieces; menu camera drift  
 - **Presentation:** multi-hue underlay + violet/magenta grid, dual-pass bloom + techno breath, trauma CA, always-on mult heat grade, short kill debris (`GFX` / `MORPH` in constants)
 - **Accessibility:** `GFX.REDUCED_FLASH = true` (console) damps CA, bomb flash, underlay, bloom strength
@@ -266,11 +267,12 @@ These were discussed or are natural next steps — pick when product asks:
 ## Session resume checklist
 
 1. Skim this file + `js/constants.js`.  
-2. `npm start` → hard-refresh browser.  
-3. Walk: splash → title → play 30s → pause → die once → game over.  
-4. If touching combat/lives: `npm run uat:adversarial` (or full `npm run uat`).  
-5. Keep UI language consistent with chrome logo + live-grid title menu.  
-6. Prefer small, focused diffs; balance via constants first.
+2. If continuing the 2026-08 upgrade, read **`docs/UPGRADE_PLAN.md` first** and start at Step 1 (do not re-open the research).  
+3. `npm start` → hard-refresh browser.  
+4. Walk: splash → title → play 30s → pause → die once → game over.  
+5. If touching combat/lives: `npm run uat:adversarial` (or full `npm run uat`).  
+6. Keep UI language consistent with chrome logo + live-grid title menu.  
+7. Prefer small, focused diffs; balance via constants first.
 
 ---
 
@@ -292,8 +294,10 @@ These were discussed or are natural next steps — pick when product asks:
 
 | Doc | Use when |
 |-----|----------|
+| `docs/UPGRADE_PLAN.md` | Locked 2026-08 upgrade path (start here next session) |
 | `docs/GAMEPLAY_TUNING_RESEARCH.md` | Changing feel, difficulty, death time, economy |
 | `docs/VS_GEOMETRY_WARS.md` | Feature parity / “are we like GW?” questions |
+| `docs/LEVELS_DESIGN.md` | Path catalog / mode / topology contracts |
 | `docs/BUILD_CONTEXT.md` | Session handoff (this file) |
 | `README.md` | Player-facing play instructions |
 

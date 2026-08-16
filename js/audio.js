@@ -1,6 +1,7 @@
 /**
  * SFX (synth) + looping BGM tracks.
- * Two Geometry Wars–style Suno instrumentals alternate by level.
+ * Classic: two Neon Swarm beds, lazy-loaded.
+ * Path: playTheme(theme) probes a file, else classic fallback.
  */
 
 import { BGM_TRACKS, BGM_VOLUME } from "./constants.js";
@@ -9,18 +10,24 @@ export class AudioBus {
   constructor() {
     this.enabled = true;
     this.ctx = null;
+    this.sfxGain = null;
+    this.sfxComp = null;
 
-    /** @type {HTMLAudioElement[]} */
-    this.tracks = BGM_TRACKS.map((src) => {
-      const a = new Audio(src);
-      a.loop = true;
-      a.preload = "auto";
-      a.volume = 0;
-      return a;
-    });
+    /** @type {string[]} */
+    this.trackSrcs = BGM_TRACKS.slice();
+    /** @type {(HTMLAudioElement|null)[]} lazy classic beds */
+    this.tracks = [];
+    /** @type {Map<string, HTMLAudioElement>} */
+    this._themes = new Map();
+    /** @type {Set<string>} */
+    this._missing = new Set();
     this.bgmIndex = -1;
+    /** @type {HTMLAudioElement|null} */
+    this._activeEl = null;
     this.bgmVolume = BGM_VOLUME;
     this._fadeTimer = null;
+    this._shootFlip = false;
+    this._loggedMissing = new Set();
   }
 
   ensure() {
@@ -28,6 +35,20 @@ export class AudioBus {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       this.ctx = new AC();
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = 0.72;
+      if (typeof this.ctx.createDynamicsCompressor === "function") {
+        this.sfxComp = this.ctx.createDynamicsCompressor();
+        this.sfxComp.threshold.value = -20;
+        this.sfxComp.knee.value = 10;
+        this.sfxComp.ratio.value = 8;
+        this.sfxComp.attack.value = 0.003;
+        this.sfxComp.release.value = 0.12;
+        this.sfxGain.connect(this.sfxComp);
+        this.sfxComp.connect(this.ctx.destination);
+      } else {
+        this.sfxGain.connect(this.ctx.destination);
+      }
     }
     if (this.ctx.state === "suspended") this.ctx.resume();
     return this.ctx;
@@ -40,7 +61,12 @@ export class AudioBus {
       this._setAllBgmVolume(0);
     } else {
       this._setAllBgmVolume(this.bgmVolume);
-      if (this.bgmIndex >= 0) this._playIndex(this.bgmIndex, false);
+      if (this._activeEl) {
+        this._activeEl.volume = this.bgmVolume;
+        this._activeEl.play().catch(() => {});
+      } else if (this.bgmIndex >= 0) {
+        this._playIndex(this.bgmIndex, false);
+      }
     }
     return this.enabled;
   }
@@ -63,15 +89,16 @@ export class AudioBus {
     g.gain.setValueAtTime(gain, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
     osc.connect(g);
-    g.connect(ctx.destination);
+    g.connect(this.sfxGain || ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + duration);
   }
 
   shoot(mult = 1) {
+    this._shootFlip = !this._shootFlip;
+    if (!this._shootFlip) return;
     const p = 1 + Math.min(0.35, (mult - 1) * 0.004);
-    this.tone(980 * p, 0.04, "square", 0.025, 380 * p);
-    this.tone(1400 * p, 0.03, "triangle", 0.015, 600 * p);
+    this.tone(980 * p, 0.04, "square", 0.012, 380 * p);
   }
 
   enemyHit() {
@@ -101,7 +128,6 @@ export class AudioBus {
     });
   }
 
-  /** Full-screen splash dismiss — short neon sting + whoosh into title. */
   splashDismiss() {
     this.tone(220, 0.12, "sawtooth", 0.04, 80);
     this.tone(660, 0.1, "square", 0.035, 1320);
@@ -141,27 +167,68 @@ export class AudioBus {
     });
   }
 
-  // ─── BGM ───────────────────────────────────────────────
-
   /**
-   * Play the track for a 1-based level (odd → track 0, even → track 1).
-   * Crossfades when switching.
+   * Play a Path theme bed. Missing file → classic fallback 1|2.
+   * @param {{ id?: string, src?: string, fallback?: 1|2 } | null | undefined} theme
    */
-  playLevelTheme(level, { restart = false } = {}) {
-    if (!this.tracks.length) return;
-    this.ensure();
-    const idx = (Math.max(1, level) - 1) % this.tracks.length;
-    if (idx === this.bgmIndex && !restart) {
-      // Same track — ensure playing
-      if (this.enabled) this._playIndex(idx, false);
+  playTheme(theme, { restart = true } = {}) {
+    if (!theme) {
+      this.playLevelTheme(1, { restart });
       return;
     }
-    this._crossfadeTo(idx, restart);
+    const fallback = theme.fallback === 2 ? 2 : 1;
+    const src = theme.src;
+    if (!src || this._missing.has(src)) {
+      if (src) this._logMissing(src);
+      this.playLevelTheme(fallback, { restart });
+      return;
+    }
+    this.ensure();
+    if (typeof Audio === "undefined") {
+      this.playLevelTheme(fallback, { restart });
+      return;
+    }
+    let el = this._themes.get(theme.id || src);
+    if (!el) {
+      el = new Audio(src);
+      el.loop = true;
+      el.preload = "metadata";
+      el.volume = 0;
+      el.addEventListener(
+        "error",
+        () => {
+          this._missing.add(src);
+          this._logMissing(src);
+          this.playLevelTheme(fallback, { restart: false });
+        },
+        { once: true }
+      );
+      this._themes.set(theme.id || src, el);
+    }
+    this._crossfadeElement(el, restart);
+  }
+
+  playLevelTheme(level, { restart = false } = {}) {
+    if (!this.trackSrcs.length) return;
+    this.ensure();
+    const idx = (Math.max(1, level) - 1) % this.trackSrcs.length;
+    const el = this._classicTrack(idx);
+    if (!el) return;
+    if (el === this._activeEl && !restart) {
+      if (this.enabled) {
+        el.volume = this.bgmVolume;
+        el.play().catch(() => {});
+      }
+      this.bgmIndex = idx;
+      return;
+    }
+    this._crossfadeElement(el, restart);
+    this.bgmIndex = idx;
   }
 
   stopBgm() {
     this._clearFade();
-    for (const t of this.tracks) {
+    this._forEachEl((t) => {
       try {
         t.pause();
         t.currentTime = 0;
@@ -169,32 +236,32 @@ export class AudioBus {
       } catch {
         /* ignore */
       }
-    }
+    });
     this.bgmIndex = -1;
+    this._activeEl = null;
   }
 
   pauseBgm() {
-    for (const t of this.tracks) {
+    this._forEachEl((t) => {
       try {
         t.pause();
       } catch {
         /* ignore */
       }
-    }
+    });
   }
 
   resumeBgm() {
-    if (!this.enabled || this.bgmIndex < 0) return;
+    if (!this.enabled) return;
     this.ensure();
-    const t = this.tracks[this.bgmIndex];
+    const t = this._activeEl || this.tracks[this.bgmIndex];
     if (!t) return;
     t.volume = this.bgmVolume;
     t.play().catch(() => {});
   }
 
   fadeOutBgm(seconds = 1) {
-    if (this.bgmIndex < 0) return;
-    const t = this.tracks[this.bgmIndex];
+    const t = this._activeEl || (this.bgmIndex >= 0 ? this.tracks[this.bgmIndex] : null);
     if (!t) return;
     this._animateVolume(t, t.volume, 0, seconds, () => {
       try {
@@ -205,32 +272,42 @@ export class AudioBus {
     });
   }
 
+  _classicTrack(idx) {
+    if (typeof Audio === "undefined") return null;
+    if (!this.tracks[idx]) {
+      const src = this.trackSrcs[idx];
+      if (!src) return null;
+      const a = new Audio(src);
+      a.loop = true;
+      a.preload = "metadata";
+      a.volume = 0;
+      this.tracks[idx] = a;
+    }
+    return this.tracks[idx];
+  }
+
+  _forEachEl(fn) {
+    for (const t of this.tracks) if (t) fn(t);
+    for (const t of this._themes.values()) fn(t);
+  }
+
   _setAllBgmVolume(v) {
-    for (const t of this.tracks) t.volume = v;
+    this._forEachEl((t) => {
+      t.volume = v;
+    });
   }
 
   _playIndex(idx, fromStart) {
-    const t = this.tracks[idx];
+    const t = this._classicTrack(idx);
     if (!t) return;
-    if (fromStart) {
-      try {
-        t.currentTime = 0;
-      } catch {
-        /* ignore */
-      }
-    }
-    if (this.enabled) {
-      t.volume = this.bgmVolume;
-      t.play().catch(() => {});
-    }
+    this._crossfadeElement(t, fromStart);
     this.bgmIndex = idx;
   }
 
-  _crossfadeTo(idx, fromStart) {
-    this._clearFade();
-    const next = this.tracks[idx];
-    const prev = this.bgmIndex >= 0 ? this.tracks[this.bgmIndex] : null;
+  _crossfadeElement(next, fromStart) {
     if (!next) return;
+    this._clearFade();
+    const prev = this._activeEl && this._activeEl !== next ? this._activeEl : null;
 
     if (fromStart) {
       try {
@@ -240,9 +317,8 @@ export class AudioBus {
       }
     }
 
-    // Pause other non-prev tracks
-    this.tracks.forEach((t, i) => {
-      if (i !== idx && t !== prev) {
+    this._forEachEl((t) => {
+      if (t !== next && t !== prev) {
         try {
           t.pause();
           t.volume = 0;
@@ -252,8 +328,9 @@ export class AudioBus {
       }
     });
 
+    this._activeEl = next;
+
     if (!this.enabled) {
-      this.bgmIndex = idx;
       next.volume = 0;
       return;
     }
@@ -262,7 +339,7 @@ export class AudioBus {
     next.play().catch(() => {});
 
     const dur = 0.9;
-    if (prev && prev !== next) {
+    if (prev) {
       this._animateVolume(prev, prev.volume, 0, dur, () => {
         try {
           prev.pause();
@@ -272,7 +349,12 @@ export class AudioBus {
       });
     }
     this._animateVolume(next, 0, this.bgmVolume, dur);
-    this.bgmIndex = idx;
+  }
+
+  _logMissing(src) {
+    if (this._loggedMissing.has(src)) return;
+    this._loggedMissing.add(src);
+    console.info("[arena:bgm-missing]", src);
   }
 
   _animateVolume(audio, from, to, seconds, onDone) {
