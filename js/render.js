@@ -20,8 +20,7 @@ export function enemyIsOutline(e) {
 }
 
 /**
- * Slow psychedelic wash behind the grid (Sektori underlay).
- * Decorative only — never collidable. Alpha stays low so entities stay readable.
+ * Quiet paper wash behind the grid. Decorative only.
  */
 function drawPsychedelicUnderlay(ctx, W, H, t = 0) {
   const reduced = !!GFX.REDUCED_FLASH;
@@ -39,44 +38,28 @@ function drawPsychedelicUnderlay(ctx, W, H, t = 0) {
   const rMax = Math.hypot(W, H) * 0.55;
 
   const g1 = ctx.createRadialGradient(cx, cy, 30, cx, cy, rMax);
-  const h1 = (t * 14) % 360;
-  g1.addColorStop(0, `hsla(${h1}, 80%, 52%, ${baseA * 0.85})`);
-  g1.addColorStop(0.45, `hsla(${(h1 + 90) % 360}, 75%, 48%, ${baseA * 0.4})`);
+  g1.addColorStop(0, `rgba(255, 244, 220, ${baseA * 0.55})`);
+  g1.addColorStop(0.5, `rgba(47, 211, 154, ${baseA * 0.22})`);
   g1.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = g1;
   ctx.fillRect(0, 0, W, H);
 
-  // Soft corner accents only (no full-field wash)
-  const g3 = ctx.createRadialGradient(W * 0.1, H * 0.15, 0, W * 0.1, H * 0.15, W * 0.32);
-  g3.addColorStop(0, `rgba(255, 40, 160, ${baseA * 0.45})`);
+  const g3 = ctx.createRadialGradient(W * 0.12, H * 0.18, 0, W * 0.12, H * 0.18, W * 0.3);
+  g3.addColorStop(0, `rgba(255, 77, 77, ${baseA * 0.28})`);
   g3.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = g3;
   ctx.fillRect(0, 0, W, H);
-  const g4 = ctx.createRadialGradient(W * 0.9, H * 0.85, 0, W * 0.9, H * 0.85, W * 0.34);
-  g4.addColorStop(0, `rgba(90, 70, 255, ${baseA * 0.4})`);
+  const g4 = ctx.createRadialGradient(W * 0.88, H * 0.82, 0, W * 0.88, H * 0.82, W * 0.32);
+  g4.addColorStop(0, `rgba(255, 210, 58, ${baseA * 0.22})`);
   g4.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = g4;
   ctx.fillRect(0, 0, W, H);
-
-  // Single slow diagonal band
-  ctx.save();
-  ctx.translate(W / 2, H / 2);
-  ctx.rotate(t * 0.07);
-  const band = ctx.createLinearGradient(-W, 0, W, 0);
-  band.addColorStop(0, "rgba(0,0,0,0)");
-  band.addColorStop(0.4, `rgba(100, 50, 220, ${baseA * 0.35})`);
-  band.addColorStop(0.5, `rgba(40, 180, 255, ${baseA * 0.4})`);
-  band.addColorStop(0.6, `rgba(220, 40, 140, ${baseA * 0.3})`);
-  band.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = band;
-  ctx.fillRect(-W, -H * 0.12, W * 2, H * 0.24);
-  ctx.restore();
 
   ctx.restore();
 }
 
 /**
- * Floor environment: deep void + psychedelic underlay + grounded neon grid plane.
+ * Floor environment: ink wash + hairline paper grid.
  * Shapes are drawn later with shadows so they read as hovering above this floor.
  * @param {number} [pulse=0.5] techno breath 0..1 (modulates major beams)
  */
@@ -105,12 +88,12 @@ export function drawGrid(
   // Floor plate — solid fill on low; gradient on high
   if (fancy) {
     const floor = ctx.createLinearGradient(0, 0, 0, H);
-    floor.addColorStop(0, "rgba(5, 8, 22, 0.97)");
-    floor.addColorStop(0.45, "rgba(3, 5, 16, 0.99)");
-    floor.addColorStop(1, "rgba(1, 2, 10, 1)");
+    floor.addColorStop(0, "rgba(18, 16, 28, 0.98)");
+    floor.addColorStop(0.5, "rgba(12, 10, 20, 0.99)");
+    floor.addColorStop(1, "rgba(7, 6, 13, 1)");
     ctx.fillStyle = floor;
   } else {
-    ctx.fillStyle = "rgba(3, 5, 16, 1)";
+    ctx.fillStyle = "rgba(12, 10, 20, 1)";
   }
   ctx.fillRect(0, 0, W, H);
 
@@ -127,9 +110,9 @@ export function drawGrid(
       H / 2,
       W * 0.7
     );
-    vg.addColorStop(0, "rgba(28, 70, 140, 0.14)");
-    vg.addColorStop(0.55, "rgba(12, 24, 55, 0.08)");
-    vg.addColorStop(1, "rgba(0, 0, 0, 0.42)");
+    vg.addColorStop(0, "rgba(255, 244, 220, 0.05)");
+    vg.addColorStop(0.55, "rgba(18, 16, 28, 0.08)");
+    vg.addColorStop(1, "rgba(0, 0, 0, 0.38)");
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, W, H);
   }
@@ -171,7 +154,7 @@ export function drawGrid(
     ctx.restore();
 
     // Simple rim
-    ctx.strokeStyle = "rgba(80, 200, 255, 0.4)";
+    ctx.strokeStyle = "rgba(18, 16, 28, 0.85)";
     ctx.lineWidth = 2;
     ctx.strokeRect(2, 2, W - 4, H - 4);
 
@@ -212,19 +195,22 @@ export function drawGrid(
     };
   }
 
-  // Impulse light on the floor
-  ctx.globalCompositeOperation = "lighter";
-  for (const imp of impulses) {
-    const a = (imp.life / imp.maxLife) * 0.4 * imp.strength;
-    bloom(ctx, imp.x, imp.y, 90 + imp.strength * 45, COLORS.gridGlow, a);
-  }
+  // Impulse ripples on the floor (ink, not neon bloom)
   ctx.globalCompositeOperation = "source-over";
+  for (const imp of impulses) {
+    const a = (imp.life / imp.maxLife) * 0.35 * imp.strength;
+    ctx.beginPath();
+    ctx.arc(imp.x, imp.y, 28 + imp.strength * 22, 0, Math.PI * 2);
+    ctx.strokeStyle = colorWithAlpha(COLORS.gridMajor, a);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
 
   // Secondary “under-grid” (slightly dimmer, offset) — sells floor thickness
   ctx.save();
   ctx.globalAlpha = 0.28;
   ctx.lineWidth = 1;
-  ctx.strokeStyle = "rgba(20, 60, 120, 0.5)";
+  ctx.strokeStyle = "rgba(18, 16, 28, 0.55)";
   ctx.translate(2, 3);
   for (let x = 0; x <= W; x += step * 2) {
     ctx.beginPath();
@@ -270,8 +256,8 @@ export function drawGrid(
 
   // Major floor beams — techno breath modulates alpha/width
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.globalAlpha = Math.max(0.35, Math.min(1.15, majorBoost));
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = Math.max(0.35, Math.min(1, majorBoost));
   ctx.strokeStyle = COLORS.gridMajor;
   ctx.lineWidth = 1.55 + pulseAmt * 0.55;
   for (let x = 0; x <= W; x += step * 5) {
@@ -296,24 +282,19 @@ export function drawGrid(
 
   // Arena rim — floor edge / trench wall (slight pulse)
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  const rimPulse = 0.9 + pulseAmt * 0.2;
-  ctx.globalAlpha = rimPulse;
-  ctx.strokeStyle = "rgba(40, 100, 180, 0.35)";
-  ctx.lineWidth = 10;
-  ctx.strokeRect(4, 4, W - 8, H - 8);
-  ctx.strokeStyle = "rgba(80, 200, 255, 0.32)";
-  ctx.lineWidth = 5;
-  ctx.strokeRect(2, 2, W - 4, H - 4);
-  ctx.strokeStyle = "rgba(160, 240, 255, 0.7)";
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(1, 1, W - 2, H - 2);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = COLORS.ink || "#12101c";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(3, 3, W - 6, H - 6);
+  ctx.strokeStyle = colorWithAlpha(COLORS.paper || "#fff4dc", 0.28);
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(6, 6, W - 12, H - 12);
   ctx.restore();
 
   // Thin atmospheric haze above the floor (separates air from ground)
   const haze = ctx.createLinearGradient(0, 0, 0, H);
   haze.addColorStop(0, "rgba(0, 0, 0, 0.12)");
-  haze.addColorStop(0.5, "rgba(0, 20, 50, 0.04)");
+  haze.addColorStop(0.5, "rgba(18, 16, 28, 0.04)");
   haze.addColorStop(1, "rgba(0, 0, 0, 0.18)");
   ctx.fillStyle = haze;
   ctx.fillRect(0, 0, W, H);
@@ -334,7 +315,7 @@ export function drawFloorContact(ctx, x, y, radius, color, alpha = 0.22) {
   g.addColorStop(0, colorWithAlpha(color, alpha));
   g.addColorStop(0.55, colorWithAlpha(color, alpha * 0.25));
   g.addColorStop(1, colorWithAlpha(color, 0));
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -413,7 +394,7 @@ function hoverY(y, bob = 0) {
 /** Motion-blur afterimages of the ship */
 export function drawAfterimages(ctx, images) {
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   for (let i = 0; i < images.length; i++) {
     const im = images[i];
     const lifeA = im.life != null ? Math.max(0, im.life / 0.18) : 1;
@@ -422,7 +403,10 @@ export function drawAfterimages(ctx, images) {
     ctx.globalAlpha = a;
     ctx.translate(im.x, hoverY(im.y));
     ctx.rotate(im.angle);
-    clawPath(ctx, 11);
+    const vis = (GFX.SHIP_DRAW || 1.38) * 11;
+    clawPath(ctx, vis);
+    ctx.fillStyle = colorWithAlpha(COLORS.paper || "#fff4dc", 0.55);
+    ctx.fill();
     ctx.strokeStyle = COLORS.player;
     ctx.lineWidth = 2;
     ctx.stroke();
@@ -475,73 +459,82 @@ export function drawPlayer(ctx, player, t = 0) {
 
   ctx.rotate(player.angle);
 
-  // Outer bloom
-  bloom(ctx, 0, 0, 28, COLORS.playerGlow, 0.45);
-  bloom(ctx, 4, 0, 14, "#ffffff", 0.2);
-
-  // Engine pulse behind
+  const vis = player.r * (GFX.SHIP_DRAW || 1.38);
   const pulse = 0.7 + 0.3 * Math.sin(t * 18);
-  bloom(ctx, -10, 0, 10 * pulse, COLORS.player, 0.35);
-
-  clawPath(ctx, player.r);
-  // Slightly thicker strike so ship stays readable on multi-hue floors
-  neonFillStroke(
-    ctx,
-    "rgba(40, 180, 255, 0.22)",
-    COLORS.player,
-    2.7
-  );
-
-  // Hot core
   ctx.beginPath();
-  ctx.arc(1, 0, 2.8, 0, Math.PI * 2);
-  ctx.fillStyle = "#fff";
+  ctx.moveTo(-vis * 0.95, 0);
+  ctx.lineTo(-vis * 1.55 * pulse, vis * 0.22);
+  ctx.lineTo(-vis * 1.55 * pulse, -vis * 0.22);
+  ctx.closePath();
+  ctx.fillStyle = COLORS.playerGlow;
   ctx.fill();
-  bloom(ctx, 1, 0, 8, "#fff", 0.5);
+  ctx.strokeStyle = "#12101c";
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  clawPath(ctx, vis);
+  ctx.fillStyle = COLORS.paper || "#fff4dc";
+  ctx.fill();
+  ctx.strokeStyle = "#12101c";
+  ctx.lineWidth = 2.1;
+  ctx.lineJoin = "round";
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(vis * 0.12, 0, vis * 0.2, 0, Math.PI * 2);
+  ctx.fillStyle = COLORS.playerGlow;
+  ctx.fill();
+  ctx.strokeStyle = "#12101c";
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
 
   ctx.restore();
 }
 
 export function drawBullets(ctx, bullets) {
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
+  ctx.lineCap = "round";
+  const fat = GFX.BULLET_DRAW || 2.4;
+  const dart = GFX.BULLET_LEN || 18;
   for (const b of bullets) {
-    // Hover slightly above the floor plane
     const bx = b.x;
     const by = hoverY(b.y, 2);
-    const r = b.r + 1.2;
+    const r = (b.r + 1.2) * fat;
 
-// Tiny floor dash under bolt (depth cue) — high quality only
     if ((GFX.FLOOR_SHADOWS || "all") === "all") {
-      drawFloorShadow(ctx, b.x, b.y, r * 1.8, 0.22);
-    }
-
-    if (GFX.LOCAL_BLOOM !== false) {
-      const glow = ctx.createRadialGradient(bx, by, 0, bx, by, r * 3.2);
-      glow.addColorStop(0, "rgba(180, 245, 255, 0.85)");
-      glow.addColorStop(0.35, "rgba(90, 220, 255, 0.35)");
-      glow.addColorStop(1, "rgba(90, 220, 255, 0)");
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(bx, by, r * 3.2, 0, Math.PI * 2);
-      ctx.fill();
+      drawFloorShadow(ctx, b.x, b.y, r * 1.4, 0.2);
     }
 
     const sp = Math.hypot(b.vx, b.vy) || 1;
-    const tx = (b.vx / sp) * (r * 1.1);
-    const ty = (b.vy / sp) * (r * 1.1);
-    ctx.strokeStyle = "rgba(200, 250, 255, 0.55)";
-    ctx.lineWidth = r * 1.15;
-    ctx.lineCap = "round";
+    const nx = b.vx / sp;
+    const ny = b.vy / sp;
+    const hx = nx * dart;
+    const hy = ny * dart;
+    const tx = nx * dart * 0.55;
+    const ty = ny * dart * 0.55;
+
+    ctx.strokeStyle = "#12101c";
+    ctx.lineWidth = r * 1.85;
     ctx.beginPath();
-    ctx.moveTo(bx - tx * 0.35, by - ty * 0.35);
-    ctx.lineTo(bx + tx * 0.45, by + ty * 0.45);
+    ctx.moveTo(bx - tx, by - ty);
+    ctx.lineTo(bx + hx * 0.35, by + hy * 0.35);
     ctx.stroke();
 
-    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = COLORS.paper || "#fff4dc";
+    ctx.lineWidth = r * 1.15;
     ctx.beginPath();
-    ctx.arc(bx, by, r * 0.75, 0, Math.PI * 2);
+    ctx.moveTo(bx - tx * 0.85, by - ty * 0.85);
+    ctx.lineTo(bx + hx * 0.22, by + hy * 0.22);
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.bomb || "#ffd23a";
+    ctx.beginPath();
+    ctx.arc(bx + hx * 0.12, by + hy * 0.12, r * 0.55, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = "#12101c";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -565,27 +558,27 @@ const maxL = g.maxLife > 0 ? g.maxLife : GEOM_LIFE;
 
     const pulse = 0.85 + 0.15 * Math.sin(t * 10 + g.x * 0.12);
     const bob = Math.sin(t * 6 + g.y * 0.08) * 1.1;
-    const s = Math.max(2.2, g.r * pulse);
+    const s = Math.max(3.2, g.r * pulse * (GFX.GEOM_DRAW || 1.45));
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(g.x, hoverY(g.y, bob));
 
-    // Soft lime glow (compact)
     bloom(ctx, 0, 0, s * 2.8, COLORS.geom, 0.35 * alpha);
 
-    // Core dot
     ctx.beginPath();
-    ctx.arc(0, 0, s * 0.55, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(220, 255, 160, 0.95)";
+    ctx.arc(0, 0, s * 0.7, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.geom;
     ctx.fill();
+    ctx.strokeStyle = "#12101c";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
     ctx.beginPath();
     ctx.arc(0, 0, s * 0.28, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = COLORS.paper || "#fff4dc";
     ctx.fill();
 
-    // Tiny 4-point sparkle (reads as loot, not a seeker)
     ctx.rotate(t * 2.2 + g.x * 0.05);
-    ctx.strokeStyle = "rgba(200, 255, 120, 0.75)";
+    ctx.strokeStyle = colorWithAlpha("#12101c", 0.7);
     ctx.lineWidth = 1;
     ctx.lineCap = "round";
     const arm = s * 1.35;
@@ -699,7 +692,8 @@ function drawEnemyOutline(ctx, e, t = 0) {
   ctx.save();
   ctx.translate(e.x, hoverY(e.y, bob));
   ctx.rotate(e.angle || 0);
-  ctx.scale(scale, scale);
+  const vis = scale * (GFX.ENEMY_DRAW || 1.22);
+  ctx.scale(vis, vis);
   // Full size silhouette — outline is the threat shape
   enemySilhouettePath(ctx, e, t);
 
@@ -715,23 +709,15 @@ const a = 0.75 + 0.25 * pulse;
     return;
   }
 
-  ctx.globalCompositeOperation = "lighter";
-  // Thick outer danger halo
-  ctx.strokeStyle = colorWithAlpha(COLORS.danger, a * 0.55);
-  ctx.lineWidth = 10;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = "#12101c";
+  ctx.lineWidth = 7;
   ctx.stroke();
-  // Core danger stroke
   ctx.strokeStyle = colorWithAlpha(COLORS.danger, a);
-  ctx.lineWidth = 3.6;
-  ctx.stroke();
-  // Hot white filament
-  ctx.strokeStyle = `rgba(255, 240, 245, ${a * 0.75})`;
-  ctx.lineWidth = 1.4;
+  ctx.lineWidth = 3.2;
   ctx.stroke();
 
-  // Strong danger bloom (no fill)
   bloom(ctx, 0, 0, e.r * 3.2, COLORS.danger, 0.42 * pulse);
-  bloom(ctx, 0, 0, e.r * 1.6, "#ffffff", 0.12 * pulse);
   ctx.restore();
 }
 
@@ -760,7 +746,7 @@ export function drawEnemies(ctx, enemies, t = 0) {
     ctx.save();
     ctx.translate(e.x, hoverY(e.y, bob));
     ctx.rotate(e.angle);
-    ctx.scale(scale, scale);
+    ctx.scale(scale * (GFX.ENEMY_DRAW || 1.22), scale * (GFX.ENEMY_DRAW || 1.22));
     ctx.globalAlpha = 0.55 + 0.45 * solidU;
 
     bloom(ctx, 0, 0, e.r * 2.2, e.color, 0.28 * solidU);
@@ -772,13 +758,13 @@ export function drawEnemies(ctx, enemies, t = 0) {
       const wob = 1 + 0.04 * Math.sin(t * 6 + e.phase);
       ctx.beginPath();
       ctx.rect(-s * wob, -s * wob, s * 2 * wob, s * 2 * wob);
-      neonFillStroke(ctx, colorWithAlpha(e.color, 0.15), e.color, 2.2);
+      neonFillStroke(ctx, colorWithAlpha(e.color, 0.82), e.color, 2.2);
     } else if (e.type === "diamond") {
       const s = e.r * (1 + 0.05 * Math.sin(t * 10 + e.spin));
       ctx.rotate(Math.PI / 4);
       ctx.beginPath();
       ctx.rect(-s, -s, s * 2, s * 2);
-      neonFillStroke(ctx, colorWithAlpha(e.color, 0.18), e.color, 2.2);
+      neonFillStroke(ctx, colorWithAlpha(e.color, 0.82), e.color, 2.2);
     } else if (e.type === "pink") {
       // Classic aggressive pink square
       const s = e.r * (e.dashing > 0 ? 1.15 : 1);
@@ -786,7 +772,7 @@ export function drawEnemies(ctx, enemies, t = 0) {
       ctx.scale(stretch, 1 / stretch);
       ctx.beginPath();
       ctx.rect(-s, -s, s * 2, s * 2);
-      neonFillStroke(ctx, colorWithAlpha(e.color, e.dashing > 0 ? 0.35 : 0.18), e.color, 2.3);
+      neonFillStroke(ctx, colorWithAlpha(e.color, e.dashing > 0 ? 0.95 : 0.82), e.color, 2.3);
       if (e.dashing > 0) bloom(ctx, 0, 0, s * 2.5, e.color, 0.45);
     } else if (e.type === "spinner") {
       const s = e.r;
@@ -799,7 +785,7 @@ export function drawEnemies(ctx, enemies, t = 0) {
         ctx.lineTo(-s * 0.15, 0);
         ctx.lineTo(-s * 0.35, -s * 0.4);
         ctx.closePath();
-        neonFillStroke(ctx, colorWithAlpha(e.color, 0.2), e.color, 1.8);
+        neonFillStroke(ctx, colorWithAlpha(e.color, 0.82), e.color, 1.8);
       }
     } else if (e.type === "splitter" || e.type === "splitterChild") {
       const s = e.r;
@@ -811,7 +797,7 @@ export function drawEnemies(ctx, enemies, t = 0) {
       ctx.lineTo(0, s);
       ctx.lineTo(-s, 0);
       ctx.closePath();
-      neonFillStroke(ctx, colorWithAlpha(e.color, 0.2), e.color, e.type === "splitter" ? 2.4 : 1.8);
+      neonFillStroke(ctx, colorWithAlpha(e.color, 0.82), e.color, e.type === "splitter" ? 2.4 : 1.8);
       if (e.type === "splitter") {
         const s2 = s * 0.45;
         ctx.beginPath();
@@ -863,7 +849,7 @@ export function drawEnemies(ctx, enemies, t = 0) {
       bloom(ctx, 0, 0, s * 2.5, e.color, 0.4);
       ctx.beginPath();
       ctx.arc(0, 0, s, 0, Math.PI * 2);
-      neonFillStroke(ctx, colorWithAlpha(e.color, 0.3), e.color, 1.6);
+      neonFillStroke(ctx, colorWithAlpha(e.color, 0.85), e.color, 1.6);
       ctx.beginPath();
       ctx.arc(0, 0, s * 0.35, 0, Math.PI * 2);
       ctx.fillStyle = "#fff";
@@ -879,7 +865,7 @@ export function drawEnemies(ctx, enemies, t = 0) {
         else ctx.lineTo(px, py);
       }
       ctx.closePath();
-      neonFillStroke(ctx, colorWithAlpha(e.color, 0.12 + 0.1 * hpFrac), e.color, 2.6);
+      neonFillStroke(ctx, colorWithAlpha(e.color, 0.7 + 0.2 * hpFrac), e.color, 2.6);
       if (e.hp < e.maxHp) {
         ctx.beginPath();
         ctx.arc(0, 0, s * 0.4, 0, Math.PI * 2 * hpFrac);
@@ -904,7 +890,7 @@ function drawSnake(ctx, e, t) {
     const pulse = 0.55 + 0.45 * Math.sin(t * 16 + (e.phase || 0));
     const a = 0.5 + 0.4 * pulse;
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = colorWithAlpha(COLORS.danger, a * 0.55);
     ctx.lineWidth = 7;
     ctx.lineJoin = "round";
@@ -944,7 +930,7 @@ function drawSnake(ctx, e, t) {
 
   // Glowing spine (hovering)
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 0.55 + 0.45 * solidU;
   ctx.strokeStyle = colorWithAlpha(e.color, 0.35 * solidU);
   ctx.lineWidth = 8;
@@ -976,7 +962,7 @@ function drawSnake(ctx, e, t) {
     ctx.lineTo(-size, 0);
     ctx.lineTo(0, -size * 0.75);
     ctx.closePath();
-    neonFillStroke(ctx, colorWithAlpha(e.color, i === 0 ? 0.28 : 0.12), e.color, i === 0 ? 2.2 : 1.4);
+    neonFillStroke(ctx, colorWithAlpha(e.color, i === 0 ? 0.9 : 0.75), e.color, i === 0 ? 2.2 : 1.4);
     ctx.restore();
   }
 }
@@ -984,11 +970,10 @@ function drawSnake(ctx, e, t) {
 export function drawBombFlash(ctx, flash) {
   if (!flash || flash <= 0) return;
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   const reduced = !!GFX.REDUCED_FLASH;
-  const a = Math.min(1, flash) * (reduced ? 0.35 : 1);
-  // Full-field punch + hot center
-  ctx.fillStyle = `rgba(255, 255, 255, ${a * 0.22})`;
+  const a = Math.min(1, flash) * (reduced ? 0.22 : 0.45);
+  ctx.fillStyle = `rgba(255, 244, 220, ${a * 0.28})`;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
   const g = ctx.createRadialGradient(
     WORLD_W / 2,
@@ -998,10 +983,9 @@ export function drawBombFlash(ctx, flash) {
     WORLD_H / 2,
     WORLD_W * 0.75
   );
-  g.addColorStop(0, `rgba(255,255,255,${a * 0.95})`);
-  g.addColorStop(0.2, `rgba(255,240,160,${a * 0.65})`);
-  g.addColorStop(0.5, `rgba(255,200,80,${a * 0.28})`);
-  g.addColorStop(1, "rgba(255,180,40,0)");
+  g.addColorStop(0, `rgba(255,244,220,${a * 0.55})`);
+  g.addColorStop(0.35, `rgba(255,210,58,${a * 0.22})`);
+  g.addColorStop(1, "rgba(255,210,58,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
   ctx.restore();
@@ -1034,9 +1018,9 @@ export function drawCheckpoints(ctx, checkpoints, nextIndex, time = 0) {
     const next = i === nextIndex;
     const pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * (next ? 6 : 3) + i));
     const a = done ? 0.22 : next ? 0.55 + 0.35 * pulse : 0.28;
-    const col = done ? "#5efcff" : COLORS.danger;
+    const col = done ? COLORS.playerGlow : COLORS.danger;
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = "source-over";
     ctx.beginPath();
     ctx.arc(zone.x, zone.y, zone.r || 70, 0, Math.PI * 2);
     ctx.strokeStyle = colorWithAlpha(col, a);
@@ -1050,7 +1034,7 @@ export function drawCheckpoints(ctx, checkpoints, nextIndex, time = 0) {
     ctx.fillStyle = colorWithAlpha(col, a);
     ctx.fill();
     if (cp.label && next) {
-      ctx.font = "10px \"Press Start 2P\", monospace";
+      ctx.font = "700 12px Outfit, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
       ctx.fillStyle = colorWithAlpha("#fff", 0.85);
@@ -1064,8 +1048,14 @@ export function drawAimReticle(ctx, rx, ry, shipX, shipY) {
   const hy = hoverY(shipY);
   const hry = hoverY(ry, 2);
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = colorWithAlpha(COLORS.player, 0.35);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = colorWithAlpha("#12101c", 0.5);
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(shipX, hy);
+  ctx.lineTo(rx, hry);
+  ctx.stroke();
+  ctx.strokeStyle = colorWithAlpha(COLORS.player, 0.7);
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(shipX, hy);
@@ -1073,7 +1063,7 @@ export function drawAimReticle(ctx, rx, ry, shipX, shipY) {
   ctx.stroke();
 
   bloom(ctx, rx, hry, 12, COLORS.player, 0.35);
-  ctx.strokeStyle = "rgba(255,255,255,0.75)";
+  ctx.strokeStyle = "#12101c";
   const s = 8;
   ctx.lineWidth = 1.2;
   ctx.beginPath();

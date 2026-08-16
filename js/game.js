@@ -1447,8 +1447,20 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
       enemy.type === "splitter";
     // Sektori kill juice: denser front-loaded pop (short TTL handled in particles)
     this.particles.burst(enemy.x, enemy.y, enemy.color, 52 + enemy.r * 1.8, 400 + enemy.r * 12);
-    this.particles.burst(enemy.x, enemy.y, "#ffffff", 22 + (big ? 14 : 0), 320);
+    this.particles.burst(enemy.x, enemy.y, COLORS.paper || "#fff4dc", 22 + (big ? 14 : 0), 320);
     this.particles.ring(enemy.x, enemy.y, enemy.color, big ? 44 : 24, big ? 420 : 280);
+    if (!fromBomb && (big || Math.random() < 0.22)) {
+      const pops = big
+        ? ["WHAM", "KABOOM", "SMASH"]
+        : ["POW", "BANG", "KAPOW"];
+      this.particles.stamp(
+        enemy.x,
+        enemy.y - 10,
+        pops[(Math.random() * pops.length) | 0],
+        big ? COLORS.danger : COLORS.bomb,
+        big ? 3.1 : 2.15
+      );
+    }
     if (big) {
       this.particles.shockwave(enemy.x, enemy.y, enemy.color, 220 + enemy.r * 8);
       this.bombFlash = Math.max(this.bombFlash, 0.22);
@@ -1499,7 +1511,8 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     punchZoom(this.cam, 0.12);
     this._gridPulse(this.player.x, this.player.y, 4.5);
     this.particles.shockwave(this.player.x, this.player.y, COLORS.bomb, 620);
-    this.particles.shockwave(this.player.x, this.player.y, "#ffffff", 400);
+    this.particles.shockwave(this.player.x, this.player.y, COLORS.paper || "#fff4dc", 400);
+    this.particles.stamp(this.player.x, this.player.y - 24, "BOOM", COLORS.coral || COLORS.danger, 3.4);
     this.particles.ring(this.player.x, this.player.y, COLORS.bomb, 72, 560);
     this.particles.burst(this.player.x, this.player.y, COLORS.player, 70, 520);
     this.particles.burst(this.player.x, this.player.y, COLORS.bomb, 40, 440);
@@ -1967,17 +1980,14 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
       }
       this.player.fireCd = this._fireCooldown();
       this.audio.shoot(this.mult);
-      recoil(this.cam, a, 3.5); // lighter kick with single stream
+      recoil(this.cam, a, 5.2);
       const c = Math.cos(a);
       const s = Math.sin(a);
-      this.particles.burst(
-        this.player.x + c * 16,
-        this.player.y + s * 16,
-        COLORS.bulletCore,
-        4,
-        110
-      );
-      this._gridPulse(this.player.x + c * 22, this.player.y + s * 22, 0.18);
+      const mx = this.player.x + c * 22;
+      const my = this.player.y + s * 22;
+      this.particles.burst(mx, my, COLORS.paper || "#fff4dc", 10, 220);
+      this.particles.burst(mx, my, COLORS.bomb, 6, 160);
+      this._gridPulse(mx, my, 0.28);
     }
 
     // Hard invuln countdown (ms). No extension — that caused infinite safety in crowds.

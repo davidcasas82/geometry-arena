@@ -1,7 +1,6 @@
 /**
- * Shared neon drawing helpers — multi-pass glow like Geometry Wars.
- * Uses additive compositing carefully for bloom without full post-process.
- * Low quality (mobile) collapses to 1–2 cheap strokes and skips local blooms.
+ * Shared ink/enamel drawing helpers.
+ * Fat black outline + colored body. No additive glow.
  */
 
 import { GFX } from "./constants.js";
@@ -22,49 +21,18 @@ export function bloom(ctx, x, y, radius, color, alpha = 0.35) {
 /**
  * Stroke a path with outer glow + bright core (caller builds path).
  */
-export function neonStroke(ctx, color, coreWidth = 2, glowWidth = 8, glowAlpha = 0.35) {
+export function neonStroke(ctx, color, coreWidth = 2, glowWidth = 8, _glowAlpha = 0.35) {
   ctx.save();
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-
-  // Mobile: single body stroke + thin dark outline (2 passes vs 5)
-  if (GFX.FANCY_NEON === false) {
-    ctx.globalCompositeOperation = "source-over";
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
-    ctx.lineWidth = coreWidth * 2.4;
-    ctx.stroke();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = coreWidth;
-    ctx.stroke();
-    ctx.restore();
-    return;
-  }
-
-  // Dark silhouette strike first (contrast against busy floor)
   ctx.globalCompositeOperation = "source-over";
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.65)";
-  ctx.lineWidth = glowWidth * 1.35 + coreWidth;
+
+  ctx.strokeStyle = "#12101c";
+  ctx.lineWidth = Math.max(coreWidth * 2.4, (glowWidth || 8) * 0.55 + coreWidth);
   ctx.stroke();
 
-  // Wide soft outer
-  ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = colorWithAlpha(color, glowAlpha * 0.45);
-  ctx.lineWidth = glowWidth * 1.8;
-  ctx.stroke();
-
-  ctx.strokeStyle = colorWithAlpha(color, glowAlpha);
-  ctx.lineWidth = glowWidth;
-  ctx.stroke();
-
-  // Core
-  ctx.globalCompositeOperation = "source-over";
   ctx.strokeStyle = color;
   ctx.lineWidth = coreWidth;
-  ctx.stroke();
-
-  // Hot white center line
-  ctx.strokeStyle = "rgba(255,255,255,0.62)";
-  ctx.lineWidth = Math.max(0.8, coreWidth * 0.38);
   ctx.stroke();
 
   ctx.restore();
@@ -74,43 +42,16 @@ export function neonFillStroke(ctx, fillColor, strokeColor, coreWidth = 2) {
   ctx.save();
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
+  ctx.globalCompositeOperation = "source-over";
   ctx.fillStyle = fillColor;
   ctx.fill();
 
-  // Mobile: fill + one colored stroke (readable without multi-pass glow)
-  if (GFX.FANCY_NEON === false) {
-    ctx.globalCompositeOperation = "source-over";
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.75)";
-    ctx.lineWidth = coreWidth * 2.6;
-    ctx.stroke();
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = coreWidth * 1.15;
-    ctx.stroke();
-    ctx.restore();
-    return;
-  }
-
-  // Dark outer strike — punches silhouette off multi-hue floor / bloom
-  ctx.globalCompositeOperation = "source-over";
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.72)";
-  ctx.lineWidth = coreWidth * 4.2;
+  ctx.strokeStyle = "#12101c";
+  ctx.lineWidth = Math.min(coreWidth + 2.4, coreWidth * 2.2);
   ctx.stroke();
 
-  // Soft colored glow outside the dark strike
-  ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = colorWithAlpha(strokeColor, 0.42);
-  ctx.lineWidth = coreWidth * 2.6;
-  ctx.stroke();
-
-  // Bright body stroke
-  ctx.globalCompositeOperation = "source-over";
   ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = coreWidth * 1.15;
-  ctx.stroke();
-
-  // Hot white strike line for edge read
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
-  ctx.lineWidth = Math.max(0.9, coreWidth * 0.4);
+  ctx.lineWidth = Math.max(1.1, coreWidth);
   ctx.stroke();
   ctx.restore();
 }

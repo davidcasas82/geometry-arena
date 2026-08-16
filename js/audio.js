@@ -95,10 +95,9 @@ export class AudioBus {
   }
 
   shoot(mult = 1) {
-    this._shootFlip = !this._shootFlip;
-    if (!this._shootFlip) return;
     const p = 1 + Math.min(0.35, (mult - 1) * 0.004);
-    this.tone(980 * p, 0.04, "square", 0.012, 380 * p);
+    this.tone(1180 * p, 0.038, "square", 0.028, 420 * p);
+    this.tone(240 * p, 0.03, "triangle", 0.014, 90);
   }
 
   enemyHit() {

@@ -145,22 +145,20 @@ export function drawColorGrade(ctx, mult = 1) {
     WORLD_W * 0.72
   );
 
-  // Center: cyan stage light → warmer core at high mult
-  const cr = Math.round(18 + t * 70);
-  const cg = Math.round(95 + t * 10);
-  const cb = Math.round(170 - t * 55);
-  g.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, ${alpha * 0.55})`);
+  // Center: paper light → amber heat
+  const cr = Math.round(40 + t * 40);
+  const cg = Math.round(36 + t * 20);
+  const cb = Math.round(28 + t * 8);
+  g.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, ${alpha * 0.45})`);
 
-  // Mid: electric violet / magenta as intensity rises
-  const mr = Math.round(50 + t * 150);
-  const mg = Math.round(50 - t * 25);
-  const mb = Math.round(150 + t * 50);
-  g.addColorStop(0.55, `rgba(${mr}, ${mg}, ${mb}, ${alpha * 0.72})`);
+  const mr = Math.round(60 + t * 80);
+  const mg = Math.round(40 + t * 10);
+  const mb = Math.round(36);
+  g.addColorStop(0.55, `rgba(${mr}, ${mg}, ${mb}, ${alpha * 0.55})`);
 
-  // Edge: hot magenta / ember at high mult, deep navy at low
-  const er = Math.round(12 + t * 200);
-  const eg = Math.round(6 + t * 30);
-  const eb = Math.round(45 + t * 70);
+  const er = Math.round(18 + t * 40);
+  const eg = Math.round(12 + t * 8);
+  const eb = Math.round(20);
   g.addColorStop(1, `rgba(${er}, ${eg}, ${eb}, ${alpha})`);
 
   ctx.globalCompositeOperation = "overlay";
@@ -171,9 +169,9 @@ export function drawColorGrade(ctx, mult = 1) {
   if (t > 0.18) {
     const heat = t - 0.18;
     ctx.globalCompositeOperation = "lighter";
-    ctx.fillStyle = `rgba(255, 40, 140, ${heat * 0.07})`;
+    ctx.fillStyle = `rgba(255, 77, 77, ${heat * 0.05})`;
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-    ctx.fillStyle = `rgba(120, 50, 255, ${heat * 0.04})`;
+    ctx.fillStyle = `rgba(255, 210, 58, ${heat * 0.03})`;
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
   }
 

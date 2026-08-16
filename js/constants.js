@@ -174,7 +174,7 @@ export const SHADOW_OY = 11;
 
 /**
  * Presentation quality tiers.
- * `high` — full desktop neon pipeline (offscreen world + bloom + CA).
+ * `high` — desktop ink/print pipeline (offscreen world + paper grade + vignette).
  * `low`  — mobile/iPad path: draw straight to the visible canvas, no heavy post.
  *
  * Console override:
@@ -186,15 +186,15 @@ export const GFX_QUALITY_PRESETS = {
     id: "high",
     maxDpr: 2,
     touchMaxDpr: 1.5,
-    bloom: true,
-    chromatic: true,
+    bloom: false,
+    chromatic: false,
     colorGrade: true,
     vignette: true,
-    /** Offscreen world buffer required for bloom / chromatic passes */
+    /** Offscreen world buffer required for grade / vignette */
     offscreenWorld: true,
-    /** Full multi-pass neon + local radial blooms */
+    /** Fat ink outline + enamel fill */
     fancyNeon: true,
-    localBloom: true,
+    localBloom: false,
     /** Warped reactive grid + underlay + under-grid */
     fancyGrid: true,
     gridStepMul: 1,
@@ -204,8 +204,8 @@ export const GFX_QUALITY_PRESETS = {
     particleMax: 1600,
     floaterMax: 56,
     afterimageMax: 12,
-    floaterShadow: true,
-    reducedFlash: false,
+    floaterShadow: false,
+    reducedFlash: true,
   },
   low: {
     id: "low",
@@ -297,8 +297,7 @@ export function applyGfxQuality(tier) {
 
 /**
  * Post-process / presentation pipeline.
- * Sektori-leaning: hotter multi-hue grade, stronger neon bloom, techno breath,
- * front-loaded debris. REDUCED_FLASH softens CA / bomb strobe / underlay pulse.
+ * Ink/print: paper grade + vignette, no idle bloom/CA. REDUCED_FLASH damps bomb wash.
  *
  * Runtime quality flags (ENABLE_*) are owned by applyGfxQuality — do not hand-edit
  * those unless you also set QUALITY_FORCE.
@@ -322,10 +321,10 @@ export const GFX = {
   ENABLE_VIGNETTE: true,
   /** When false, world draws straight to the visible canvas (no blit / bloom buffers) */
   USE_OFFSCREEN_WORLD: true,
-  /** Multi-pass neon strokes + white hot core */
+  /** Fat ink outline + enamel fill */
   FANCY_NEON: true,
-  /** Per-entity radial gradient blooms (very expensive on mobile GPU) */
-  LOCAL_BLOOM: true,
+  /** Per-entity radial blooms — off for ink look */
+  LOCAL_BLOOM: false,
   /** Warped grid, underlay, under-grid, impulse shimmer */
   FANCY_GRID: true,
   /** Multiplier on GRID_STEP (higher = fewer lines) */
@@ -355,8 +354,8 @@ export const GFX = {
   CA_MAX_OFFSET_PX: 6,
   CA_ALPHA: 0.34,
   /** Mult color-grade — present but not floor-washing */
-  GRADE_BASE_ALPHA: 0.1,
-  GRADE_MULT_ALPHA: 0.26,
+  GRADE_BASE_ALPHA: 0.06,
+  GRADE_MULT_ALPHA: 0.12,
   /** Vignette edge darkness at mult=1 and high mult */
   VIGNETTE_BASE: 0.58,
   VIGNETTE_MULT_EXTRA: 0.2,
@@ -364,7 +363,7 @@ export const GFX = {
    * Accessibility: damp flash-heavy effects (CA, bomb flash, underlay pulse).
    * Toggle from console: GFX.REDUCED_FLASH = true
    */
-  REDUCED_FLASH: false,
+  REDUCED_FLASH: true,
   /**
    * Fake techno BPM for grid/bloom breath (no true beat detection).
    * Half-note @ 128 BPM ≈ 0.94s period.
@@ -380,8 +379,8 @@ export const GFX = {
    * Psychedelic underlay — accent only. Too high washes entity contrast.
    * Keep dark floor dominant; shapes carry the color.
    */
-  UNDERLAY_ALPHA: 0.09,
-  UNDERLAY_ALPHA_REDUCED: 0.035,
+  UNDERLAY_ALPHA: 0.04,
+  UNDERLAY_ALPHA_REDUCED: 0.02,
   /**
    * Enemy enter 0→1 timeline (Sektori outline telegraph):
    * enter < OUTLINE_END → thick red stroke only, no collision
@@ -392,6 +391,12 @@ export const GFX = {
   /** Kill debris: prefer short hot streaks over lingering soft dots */
   KILL_STREAK_LIFE: 0.26,
   KILL_SOFT_LIFE: 0.32,
+  /** Draw-only size. Collision still uses PLAYER_RADIUS / enemy.r / BULLET_RADIUS. */
+  SHIP_DRAW: 1.68,
+  ENEMY_DRAW: 1.42,
+  GEOM_DRAW: 1.65,
+  BULLET_DRAW: 1.7,
+  BULLET_LEN: 34,
 };
 
 // Default tier for the current environment (no-ops headless UAT without window).
@@ -424,35 +429,33 @@ export const MORPH = {
 };
 
 export const COLORS = {
-  bg: "#020208",
-  bgDeep: "#000005",
-  // Grid: cyan primary with a touch of violet — not a purple wash
-  grid: "rgba(55, 130, 255, 0.17)",
-  gridMajor: "rgba(110, 170, 255, 0.34)",
-  gridGlow: "rgba(120, 160, 255, 0.48)",
-  player: "#7cfff0",
-  playerGlow: "#3ae8ff",
-  playerCore: "#ffffff",
-  bullet: "#ffffff",
-  bulletCore: "#b8fbff",
-  // Enemy cast: pure primaries/secondaries against void (Sektori multi-hue)
-  wanderer: "#3dff7a",
-  diamond: "#1ae8ff",
-  spinner: "#d86bff",
-  tank: "#ff9a2e",
-  snake: "#ff2eb8",
-  pink: "#ff3db8",
-  splitter: "#c24dff",
-  void: "#7a5cff",
-  atom: "#d4c4ff",
-  geom: "#e8ff5a",
-  /** Sacred threat telegraph — spawn outlines + danger only */
-  danger: "#ff1a3c",
-  bomb: "#ffe14a",
-  text: "#f2f6ff",
-  /** Future system tokens (selector / evolver) — semantic palette */
-  selector: "#3d8cff",
-  evolver: "#ffd84a",
+  bg: "#07060d",
+  bgDeep: "#12101c",
+  grid: "rgba(243, 230, 200, 0.1)",
+  gridMajor: "rgba(243, 230, 200, 0.2)",
+  gridGlow: "rgba(255, 210, 58, 0.28)",
+  player: "#fff4dc",
+  playerGlow: "#2fd39a",
+  playerCore: "#fff4dc",
+  bullet: "#fff4dc",
+  bulletCore: "#ffd23a",
+  wanderer: "#2fd39a",
+  diamond: "#1f9a7a",
+  spinner: "#c9b8e0",
+  tank: "#e8a020",
+  snake: "#ff4d4d",
+  pink: "#ff6a5a",
+  splitter: "#a88bc4",
+  void: "#5a4868",
+  atom: "#d8cce8",
+  geom: "#ffd23a",
+  danger: "#ff4d4d",
+  bomb: "#ffd23a",
+  text: "#fff4dc",
+  selector: "#2fd39a",
+  evolver: "#ffd23a",
+  ink: "#12101c",
+  paper: "#fff4dc",
 };
 
 // ── Dial C: Enemy roles (speeds for ~90–150s pressure) ───

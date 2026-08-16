@@ -192,14 +192,14 @@ Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu stil
 
 ## Visual / audio language
 
-- **Palette:** deep black void, hotter multi-hue neon (cyan player `#7cfff0`, pure enemy primaries, lime geoms `#e8ff5a`, sacred danger red `#ff1a3c` for telegraphs only)
-- **Logo:** Orbitron blackletter-style chrome gradients + extruded text-shadow; Press Start 2P for prompts/buttons
-- **Entities:** hover height + ground shadow for “above the grid” read
-- **Spawn telegraph (Sektori):** enemies enter as thick red outline wireframes (`enter < GFX.ENEMY_OUTLINE_END`, ~450ms) — no collision until solidify; then fill + neon
+- **Palette:** night ink `#12101c`, paper `#fff4dc`, jade `#2fd39a`, coral `#ff4d4d`, amber `#ffd23a`. Same tokens for chrome and world.
+- **Logo:** Bangers italic cream face, fat black outline, splat energy. Outfit for HUD/body.
+- **Entities:** hover height + ground shadow; enamel fills + ink stroke (not neon glow)
+- **Spawn telegraph:** enemies enter as thick coral ink outlines (`enter < GFX.ENEMY_OUTLINE_END`, ~450ms) — no collision until solidify; then enamel fill
 - **Classic arena morph:** `MORPH` in constants — first warn ~48s, then every ~22s, 2.6s red danger telegraph (`drawMorphDanger`); trap outside next shape = death (CRUSHED). Path levels static.
 - **Camera:** trauma shake with combat soft-cap + diminishing returns (dense kills don’t pin full earthquake); big events use `{ big: true }`; zoom punch on set pieces; menu camera drift  
-- **Presentation:** multi-hue underlay + violet/magenta grid, dual-pass bloom + techno breath, trauma CA, always-on mult heat grade, short kill debris (`GFX` / `MORPH` in constants)
-- **Accessibility:** `GFX.REDUCED_FLASH = true` (console) damps CA, bomb flash, underlay, bloom strength
+- **Presentation:** ink-wash floor, hairline paper grid, no idle bloom/CA. Paper grade + vignette. Kill debris is ink filaments (`GFX` / `MORPH` in constants)
+- **Accessibility:** `GFX.REDUCED_FLASH = true` by default; damps bomb wash / underlay
 - **Touch / mobile:** dual virtual sticks (left move, right aim+auto-fire), BOMB/PAUSE fabs; gated by coarse pointer or narrow+touch — desktop unchanged (`input.bindTouchControls`, `body.touch-ui`)
 - **Splash dismiss:** iris `clip-path` wipe + scanline drift + `audio.splashDismiss()` sting (same user gesture unlocks AudioContext)
 - **Title ambient:** geom rain drifts on menu; PLAY fires `_playShipIntro` thruster burst

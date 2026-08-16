@@ -51,7 +51,7 @@ export class ParticleSystem {
         vy: Math.sin(ang) * sp,
         life,
         maxLife: life,
-        size: isStreak ? 1.3 + Math.random() * 1.5 : 1.8 + Math.random() * 2.6,
+        size: isStreak ? 2.4 + Math.random() * 2.4 : 2.8 + Math.random() * 3.4,
         color,
         streak: isStreak,
         hot: isStreak || Math.random() < 0.55,
@@ -70,10 +70,10 @@ export class ParticleSystem {
         vy: Math.sin(ang) * sp,
         life,
         maxLife: life,
-        size: 1.4 + Math.random() * 1.6,
-        color: "#ffffff",
+        size: 2.6 + Math.random() * 2.2,
+        color: "#fff4dc",
         streak: true,
-        hot: true,
+        hot: false,
       });
     }
   }
@@ -108,7 +108,7 @@ ring(x, y, color, count = 40, speed = 360) {
       life: 0.32,
       maxLife: 0.32,
       color,
-      width: 4.2,
+      width: 7.2,
     });
     if ((GFX.PARTICLE_SCALE ?? 1) > 0.55) {
       this.rings.push({
@@ -118,7 +118,7 @@ ring(x, y, color, count = 40, speed = 360) {
         vr: speed * 1.05,
         life: 0.24,
         maxLife: 0.24,
-        color: "#ffffff",
+        color,
         width: 2.4,
       });
     }
@@ -157,7 +157,7 @@ ring(x, y, color, count = 40, speed = 360) {
         vr: maxR * 1.7,
         life: 0.45,
         maxLife: 0.45,
-        color: "#ffffff",
+        color,
         width: 3,
       });
       // Delayed secondary pop
@@ -209,6 +209,24 @@ floater(x, y, text, color = "#ffffff", scale = 1) {
       maxLife: 0.95,
       vy: -46,
       scale,
+      stamp: false,
+    });
+  }
+
+  /** JSRF / comic wall stamp — POW, BANG, WHAM. Visual only. */
+  stamp(x, y, text, color = "#ffd23a", scale = 1.8) {
+    if (this.floaters.length >= floaterCap()) this.floaters.shift();
+    this.floaters.push({
+      x: x + (Math.random() - 0.5) * 18,
+      y: y + (Math.random() - 0.5) * 10,
+      text,
+      color,
+      life: 0.55,
+      maxLife: 0.55,
+      vy: -18,
+      scale,
+      stamp: true,
+      tilt: (Math.random() - 0.5) * 0.7,
     });
   }
 
@@ -431,9 +449,8 @@ const room = particleCap() - this.particles.length;
   }
 
   draw(ctx) {
-    // Additive particles
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = "source-over";
 
     for (const p of this.particles) {
       const a = Math.max(0, p.life / p.maxLife);
@@ -450,9 +467,9 @@ const room = particleCap() - this.particles.length;
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(p.x - tx, p.y - ty);
         ctx.stroke();
-if ((p.hot || p.attract) && GFX.FANCY_NEON !== false) {
-          ctx.strokeStyle = `rgba(255,255,255,${a * 0.55})`;
-          ctx.lineWidth = Math.max(0.6, p.size * a * 0.35);
+        if (p.attract) {
+          ctx.strokeStyle = colorWithAlpha("#12101c", a * 0.55);
+          ctx.lineWidth = Math.max(0.8, p.size * a * 0.45);
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p.x - tx * 0.55, p.y - ty * 0.55);
@@ -463,12 +480,6 @@ if ((p.hot || p.attract) && GFX.FANCY_NEON !== false) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * a, 0, Math.PI * 2);
         ctx.fill();
-        if (p.hot && GFX.FANCY_NEON !== false) {
-          ctx.fillStyle = `rgba(255,255,255,${a * 0.7})`;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size * a * 0.4, 0, Math.PI * 2);
-          ctx.fill();
-        }
       }
     }
 
@@ -512,27 +523,16 @@ if ((p.hot || p.attract) && GFX.FANCY_NEON !== false) {
         ctx.stroke();
         continue;
       }
-      // Soft outer glow
-      ctx.strokeStyle = colorWithAlpha(b.color, a * 0.35);
-      ctx.lineWidth = b.width * a * 3.2;
+      ctx.strokeStyle = "#12101c";
+      ctx.lineWidth = b.width * a * 2.2;
       ctx.beginPath();
       ctx.moveTo(b.points[0].x, b.points[0].y);
       for (let i = 1; i < b.points.length; i++) {
         ctx.lineTo(b.points[i].x, b.points[i].y);
       }
       ctx.stroke();
-      // Core
       ctx.strokeStyle = colorWithAlpha(b.color, a * 0.95);
       ctx.lineWidth = b.width * a;
-      ctx.beginPath();
-      ctx.moveTo(b.points[0].x, b.points[0].y);
-      for (let i = 1; i < b.points.length; i++) {
-        ctx.lineTo(b.points[i].x, b.points[i].y);
-      }
-      ctx.stroke();
-      // Hot white filament
-      ctx.strokeStyle = `rgba(255,255,255,${a * 0.75})`;
-      ctx.lineWidth = Math.max(0.5, b.width * a * 0.35);
       ctx.beginPath();
       ctx.moveTo(b.points[0].x, b.points[0].y);
       for (let i = 1; i < b.points.length; i++) {
@@ -553,16 +553,15 @@ if ((p.hot || p.attract) && GFX.FANCY_NEON !== false) {
       ctx.translate(f.x, f.y);
       ctx.scale(sc, sc);
       ctx.globalAlpha = a;
-      ctx.font = "700 15px Orbitron, Outfit, sans-serif";
-      if (GFX.FLOATER_SHADOW !== false) {
-        ctx.shadowColor = f.color;
-        ctx.shadowBlur = 12;
-      }
+      if (f.tilt) ctx.rotate(f.tilt);
+      ctx.font = f.stamp
+        ? "900 46px Bangers, Outfit, sans-serif"
+        : "700 18px Outfit, sans-serif";
+      ctx.strokeStyle = "#12101c";
+      ctx.lineWidth = f.stamp ? 10 : 3.5;
+      ctx.lineJoin = "round";
+      ctx.strokeText(f.text, 0, 0);
       ctx.fillStyle = f.color;
-      ctx.fillText(f.text, 0, 0);
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.font = "700 13px Orbitron, Outfit, sans-serif";
       ctx.fillText(f.text, 0, 0);
       ctx.restore();
     }

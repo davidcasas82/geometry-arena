@@ -47,7 +47,7 @@ export const SPAWN_PATTERN = Object.freeze({
 
 /** Chapter display titles (UI). */
 export const CHAPTER_TITLES = Object.freeze({
-  1: "Neon Primer",
+  1: "Ink Primer",
   2: "Pressure Geometry",
 });
 
@@ -265,7 +265,7 @@ export const LEVELS = [
   {
     id: "path-01-grid-wake",
     name: "Grid Wake",
-    tagline: "Learn the neon floor.",
+    tagline: "Learn the ink floor.",
     chapter: 1,
     order: 1,
     mode: MODE.EVOLVED,

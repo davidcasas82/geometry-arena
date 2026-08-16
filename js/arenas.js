@@ -709,15 +709,14 @@ function projectOutOfSolid(arena, x, y, r) {
   };
 }
 
-// ── Drawing helpers (neon) ───────────────────────────────────
+// ── Drawing helpers (ink walls) ──────────────────────────────
 
 function drawAabbWalls(ctx, b, t) {
   const pulse = 0.55 + Math.sin(t * 2.2) * 0.08;
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
 
-  // Outer trench glow
-  ctx.strokeStyle = colorWithAlpha(COLORS.playerGlow, 0.2 * pulse);
+  ctx.strokeStyle = colorWithAlpha(COLORS.ink || "#12101c", 0.35 * pulse);
   ctx.lineWidth = 14;
   ctx.strokeRect(b.x - 2, b.y - 2, b.w + 4, b.h + 4);
 
@@ -769,7 +768,7 @@ function drawDonutHole(ctx, arena, t) {
   ctx.fill();
 
   // Danger ring
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   bloom(ctx, arena.cx, arena.cy, innerR * 0.55, COLORS.danger, 0.12 * pulse);
   ctx.beginPath();
   ctx.arc(arena.cx, arena.cy, innerR, 0, Math.PI * 2);
@@ -809,7 +808,7 @@ function drawCrossSolids(ctx, arena, t) {
   ctx.fillRect(cx + arm, cy + arm, W - (cx + arm), H - (cy + arm));
 
   // Neon edges of the plus
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   const segs = [
     // horizontal arm outline
     [0, cy - arm, W, cy - arm],
@@ -843,7 +842,7 @@ function drawPillGuide(ctx, arena, t) {
   const pulse = 0.55 + Math.sin(t * 2.1) * 0.08;
   const r = Math.min(b.w, b.h) * 0.5;
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   roundRectPath(ctx, b.x, b.y, b.w, b.h, r);
   neonStroke(ctx, COLORS.player, 1.6, 8, 0.3 * pulse);
   ctx.restore();
@@ -889,8 +888,7 @@ function drawSplitWall(ctx, arena, t) {
     ctx.fillRect(x0, 0, thick, Math.max(0, arena.cy - halfGap));
     ctx.fillRect(x0, arena.cy + halfGap, thick, Math.max(0, arena.worldH - (arena.cy + halfGap)));
 
-    ctx.globalCompositeOperation = "lighter";
-    // Wall edges
+    ctx.globalCompositeOperation = "source-over";
     for (const y0 of [0, arena.cy + halfGap]) {
       const h =
         y0 === 0 ? arena.cy - halfGap : arena.worldH - (arena.cy + halfGap);
@@ -911,7 +909,7 @@ function drawSplitWall(ctx, arena, t) {
     ctx.fillRect(0, y0, Math.max(0, arena.cx - halfGap), thick);
     ctx.fillRect(arena.cx + halfGap, y0, Math.max(0, arena.worldW - (arena.cx + halfGap)), thick);
 
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = "source-over";
     for (const x0 of [0, arena.cx + halfGap]) {
       const w =
         x0 === 0 ? arena.cx - halfGap : arena.worldW - (arena.cx + halfGap);
@@ -933,8 +931,7 @@ function drawSplitWall(ctx, arena, t) {
 function drawTorusCues(ctx, arena, t) {
   const pulse = 0.4 + Math.sin(t * 1.8) * 0.1;
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  // Dashed wrap rim — edges are doors
+  ctx.globalCompositeOperation = "source-over";
   ctx.setLineDash([10, 14]);
   ctx.beginPath();
   ctx.rect(6, 6, arena.worldW - 12, arena.worldH - 12);
