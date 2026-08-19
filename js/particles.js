@@ -555,7 +555,7 @@ const room = particleCap() - this.particles.length;
       ctx.globalAlpha = a;
       if (f.tilt) ctx.rotate(f.tilt);
       ctx.font = f.stamp
-        ? "900 46px Bangers, Outfit, sans-serif"
+        ? "italic 900 46px 'Barlow Condensed', Outfit, sans-serif"
         : "700 18px Outfit, sans-serif";
       ctx.strokeStyle = "#12101c";
       ctx.lineWidth = f.stamp ? 10 : 3.5;

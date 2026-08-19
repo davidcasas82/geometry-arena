@@ -11,7 +11,7 @@
   --shadow: 4px 5px 0 #000;
   --radius: 4px;
   --font: "Outfit", system-ui, sans-serif;
-  --display: "Bangers", "Outfit", system-ui, sans-serif;
+  --display: "Barlow Condensed", "Oswald", "Outfit", system-ui, sans-serif;
   --ink: #12101c;
   --paper: #fff4dc;
   --jade: #2fd39a;
@@ -267,6 +267,9 @@ body {
 
 /* Title menu: see the living grid through light vignette */
 .overlay.mode-title {
+  justify-content: flex-start;
+  padding: clamp(72px, 12vh, 120px) 16px 28px;
+  overflow: auto;
   background:
     radial-gradient(ellipse 70% 55% at 50% 42%, rgba(4, 6, 18, 0.15), transparent 70%),
     linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, transparent 28%, transparent 72%, rgba(0, 0, 0, 0.45) 100%);
@@ -318,7 +321,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 0;
-  max-width: min(720px, 94vw);
+  max-width: min(1100px, 96vw);
   text-align: center;
 }
 
@@ -345,9 +348,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  line-height: 0.92;
-  gap: 0.05em;
-  filter: drop-shadow(5px 6px 0 #000);
+  line-height: 0.82;
+  gap: 0.06em;
+  padding: 0.08em 0.22em 0.28em;
 }
 
 .title-logo-line {
@@ -361,33 +364,52 @@ body {
 }
 
 .title-logo-geo {
-  font-size: clamp(2.6rem, 8vw, 4.6rem);
+  font-size: clamp(2.6rem, 11.5vw, 9.5rem);
 }
 
 .title-logo-arena {
-  font-size: clamp(3rem, 9.5vw, 5.4rem);
+  font-size: clamp(3rem, 13.5vw, 11rem);
 }
 
-.title-logo-fill {
+.title-logo-line {
+  letter-spacing: -0.03em;
+}
+/* Block comic lockup: magenta face, cyan extrusion, ink outline */
+.block-mark,
+.title-logo-fill,
+.logo-fill,
+.comic-stamp {
   display: inline-block;
-  color: var(--paper);
-  -webkit-text-stroke: 6px #000;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #ff2d6a;
+  -webkit-text-fill-color: #ff2d6a;
+  -webkit-text-stroke: 0.045em #111;
   paint-order: stroke fill;
-  text-shadow: none;
-  background: none;
-  -webkit-text-fill-color: var(--paper);
+  text-shadow:
+    0.018em 0.018em 0 #3de8ff,
+    0.036em 0.036em 0 #3de8ff,
+    0.054em 0.054em 0 #2ad4f0,
+    0.072em 0.072em 0 #18c4e4,
+    0.09em 0.09em 0 #111,
+    0.14em 0.16em 0 rgba(0, 0, 0, 0.28);
 }
 
-.title-logo-geo .title-logo-fill {
-  color: var(--paper);
-  -webkit-text-fill-color: var(--paper);
+.comic-stamp {
+  position: relative;
+  background-image: radial-gradient(circle, rgba(17, 17, 17, 0.28) 1.15px, transparent 1.35px);
+  background-size: 6px 6px;
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
-.title-logo-arena .title-logo-fill {
-  color: var(--paper);
-  -webkit-text-fill-color: var(--paper);
-  background-image: none;
+.path-result.is-fail .path-result-fill,
+.gameover-over .gameover-fill {
+  color: #ff2d6a;
+  -webkit-text-fill-color: #ff2d6a;
 }
+
 .title-logo-arena .title-logo-fill-unused {
   background-image: linear-gradient(
     180deg,
@@ -400,7 +422,7 @@ body {
 }
 
 .title-tag {
-  margin-top: 1rem;
+  margin-top: 2.1rem;
   max-width: 28em;
   font-family: var(--font);
   font-size: clamp(1.15rem, 2.4vw, 1.4rem);
@@ -434,7 +456,7 @@ body {
   gap: 16px;
   justify-content: center;
   align-items: stretch;
-  margin-top: 1.6rem;
+  margin-top: 2.2rem;
   width: min(560px, 100%);
 }
 
@@ -592,7 +614,7 @@ body {
   min-width: 200px;
   padding: 16px 36px 14px;
   border-radius: 4px;
-  font-family: Bangers, Outfit, sans-serif;
+  font-family: var(--display);
   font-size: clamp(1.35rem, 2.6vw, 1.75rem);
   letter-spacing: 0.06em;
   color: #12101c;
@@ -788,11 +810,11 @@ body {
 }
 
 .gameover-game {
-  font-size: clamp(2.6rem, 11vw, 5.8rem);
+  font-size: clamp(3.2rem, 14vw, 7.2rem);
 }
 
 .gameover-over {
-  font-size: clamp(3rem, 13vw, 6.8rem);
+  font-size: clamp(3.8rem, 16vw, 8.4rem);
 }
 
 /*
@@ -800,47 +822,8 @@ body {
  * Keep fill filter light so the gradient layer actually reads (was too muddy).
  */
 .gameover-fill {
-  display: inline-block;
-  position: relative;
-  color: var(--paper);
-  -webkit-text-fill-color: var(--paper);
-  -webkit-text-stroke: 8px #000;
-  paint-order: stroke fill;
-  text-shadow: none;
-  background: none;
-}
-
-/* GAME — cyan → electric blue → violet (arena chrome) */
-.gameover-game .gameover-fill {
-  color: var(--paper);
-  -webkit-text-fill-color: var(--paper);
-  background-image: none;
-  filter: none;
-}
-
-/* OVER — yellow → orange → magenta (title GEOMETRY energy) */
-.gameover-over .gameover-fill {
-  color: var(--coral);
-  -webkit-text-fill-color: var(--coral);
-  background-image: none;
-  filter: none;
-}
-
-/* Soft shine sweep so the face reads as polished chrome */
-.gameover-fill::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 28%,
-    rgba(255, 255, 255, 0.42) 46%,
-    transparent 58%
-  );
-  mix-blend-mode: overlay;
-  animation: logo-shine 4.5s ease-in-out infinite;
-  pointer-events: none;
-  border-radius: 2px;
+  color: #ff2d6a;
+  -webkit-text-fill-color: #ff2d6a;
 }
 
 .gameover-tag {
@@ -963,7 +946,7 @@ body {
 .gameover-actions .go-title-btn {
   min-width: 160px;
   padding: 16px 24px 14px;
-  font-family: Bangers, Outfit, sans-serif;
+  font-family: var(--display);
   font-size: 1.2rem;
   letter-spacing: 0.06em;
   border: 3px solid #000;
@@ -1534,8 +1517,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  line-height: 0.9;
-  filter: drop-shadow(0 0 22px rgba(125, 249, 255, 0.3));
+  line-height: 0.86;
+  filter: drop-shadow(0 0 18px rgba(255, 77, 77, 0.28));
 }
 
 .path-result-word {
@@ -1543,50 +1526,18 @@ body {
   font-family: var(--display);
   font-weight: 900;
   font-style: italic;
-  font-size: clamp(2.2rem, 10vw, 4.2rem);
-  letter-spacing: 0.04em;
+  font-size: clamp(3.4rem, 16vw, 7.2rem);
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.35);
 }
 
-.path-result-fill {
-  display: inline-block;
-  position: relative;
-  text-shadow:
-    1px 1px 0 #1a0a30,
-    2px 2px 0 #120820,
-    3px 3px 0 #0a0414,
-    4px 5px 0 rgba(0, 0, 0, 0.55),
-    0 0 28px rgba(125, 249, 255, 0.35);
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  background-image: linear-gradient(
-    180deg,
-    #f0ffff 0%,
-    #7df9ff 16%,
-    #4a7cff 48%,
-    #b04aff 82%,
-    #ff4ac8 100%
-  );
-}
-
-.path-result.is-fail .path-result-fill {
-  background-image: linear-gradient(
-    180deg,
-    #fff0f5 0%,
-    #ff8ab8 18%,
-    #ff2d6a 48%,
-    #c020ff 82%,
-    #6a20ff 100%
-  );
-  text-shadow:
-    1px 1px 0 #1a0a30,
-    2px 2px 0 #120820,
-    3px 3px 0 #0a0414,
-    4px 5px 0 rgba(0, 0, 0, 0.55),
-    0 0 28px rgba(255, 80, 140, 0.4);
+.path-result.is-fail .path-result-fill,
+.gameover-over .gameover-fill {
+  color: #ff6a5a;
+  background-image:
+    radial-gradient(circle, rgba(18, 16, 28, 0.45) 1.2px, transparent 1.4px),
+    linear-gradient(180deg, #ffc4b8 0%, #ff6a5a 55%, #ff4d4d 100%);
+  background-size: 7px 7px, auto;
 }
 
 .path-result-tag {
@@ -2795,29 +2746,7 @@ body.touch-ui .title-menu {
 
 /* Bevel / chrome fill via layered shadows + gradient text */
 .logo-fill {
-  display: inline-block;
   position: relative;
-  color: var(--paper);
-  -webkit-text-fill-color: var(--paper);
-  -webkit-text-stroke: 8px #000;
-  paint-order: stroke fill;
-  text-shadow: none;
-  background: none;
-  filter: drop-shadow(6px 7px 0 #000);
-}
-
-.logo-geometry .logo-fill {
-  color: var(--paper);
-  -webkit-text-fill-color: var(--paper);
-  background-image: none;
-  filter: drop-shadow(6px 7px 0 #000);
-}
-
-.logo-arena .logo-fill {
-  color: var(--paper);
-  -webkit-text-fill-color: var(--paper);
-  background-image: none;
-  filter: drop-shadow(6px 7px 0 #000);
 }
 
 /* Subtle shine sweep on the wordmark */

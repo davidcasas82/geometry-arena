@@ -1283,12 +1283,13 @@ this.modeFlags = new Set();
           e.approach = job.approach;
           // Hold formation while drifting in (longer early / circle closes)
           const circle = this.phraseTag === "circle";
+          const jitter = Math.random() * 0.12;
           e.approachTime =
             this.elapsed < this._safeOpeningSec()
-              ? 0.85
+              ? (PHRASE.APPROACH_OPENING || 1.15) + jitter
               : circle
-                ? 0.55 + Math.random() * 0.15
-                : 0.45 + Math.random() * 0.25;
+                ? (PHRASE.APPROACH_CIRCLE || 0.5) + jitter * 0.5
+                : (PHRASE.APPROACH_NORMAL || 0.78) + jitter;
         }
         this.enemies.push(e);
         spawned += 1;

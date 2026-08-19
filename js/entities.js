@@ -218,6 +218,10 @@ export function spawnEnemy(typeName, elapsed = 0, at = null) {
     // Formation entry: hold line shape briefly while drifting in
     approach: null,
     approachTime: 0,
+    commitTime: 0,
+    commitDirX: 0,
+    commitDirY: 0,
+    coiling: 0,
   };
 
   if (def.type === "snake") {
@@ -297,7 +301,14 @@ export function updateEnemies(enemies, player, dt, elapsed = 0) {
       const spd = e.speed * 0.85;
       e.x += e.approach.x * spd * dt;
       e.y += e.approach.y * spd * dt;
-      e.angle = Math.atan2(e.approach.y, e.approach.x);
+      e.angle =
+        e.type === "wanderer" ? 0 : Math.atan2(e.approach.y, e.approach.x);
+      if (e.type === "snake") {
+        if (!e.history) e.history = [];
+        e.history.unshift({ x: e.x, y: e.y });
+        const maxHist = (e.segCount || 8) * (e.spacing || 14) + 4;
+        if (e.history.length > maxHist) e.history.length = maxHist;
+      }
       // Soft bounds during approach; full arena clamp after enter
       {
         const ar = arenaOrDefault();
@@ -324,19 +335,48 @@ export function updateEnemies(enemies, player, dt, elapsed = 0) {
       const wobble = Math.sin(e.phase) * 0.35;
       const c = Math.cos(wobble);
       const s = Math.sin(wobble);
-      const sx = toPlayer.x * c - toPlayer.y * s;
-      const sy = toPlayer.x * s + toPlayer.y * c;
+      let hx = toPlayer.x;
+      let hy = toPlayer.y;
+      const packR = ENEMY.wanderer.packRange || 86;
+      let best = null;
+      let bestD = packR;
+      for (const o of enemies) {
+        if (o === e || o.dead || o.type !== "wanderer") continue;
+        const od = Math.hypot(o.x - e.x, o.y - e.y);
+        if (od < bestD) {
+          bestD = od;
+          best = o;
+        }
+      }
+      if (best) {
+        hx = hx * 0.62 + ((best.x - e.x) / (bestD || 1)) * 0.38;
+        hy = hy * 0.62 + ((best.y - e.y) / (bestD || 1)) * 0.38;
+        const hl = Math.hypot(hx, hy) || 1;
+        hx /= hl;
+        hy /= hl;
+      }
+      const sx = hx * c - hy * s;
+      const sy = hx * s + hy * c;
       e.x += sx * e.speed * dt;
       e.y += sy * e.speed * dt;
-      e.angle = Math.atan2(sy, sx);
+      e.angle = 0;
+      e.spin += dt * 1.8;
     } else if (e.type === "diamond") {
-      e.x += toPlayer.x * e.speed * dt;
-      e.y += toPlayer.y * e.speed * dt;
-      e.angle = Math.atan2(toPlayer.y, toPlayer.x) + Math.PI / 4;
+      if (e.commitTime <= 0) {
+        e.commitTime = ENEMY.diamond.commit || 0.35;
+        e.commitDirX = toPlayer.x;
+        e.commitDirY = toPlayer.y;
+      }
+      e.commitTime -= dt;
+      e.x += e.commitDirX * e.speed * dt;
+      e.y += e.commitDirY * e.speed * dt;
+      e.angle = Math.atan2(e.commitDirY, e.commitDirX);
       e.spin += dt * 6;
     } else if (e.type === "pink") {
-      // Creep, then dash
+      // Creep, coil, then bite-dash
       e.dashCd -= dt;
+      const coilWin = ENEMY.pink.coil || 0.2;
+      e.coiling = e.dashing <= 0 && e.dashCd > 0 && e.dashCd <= coilWin ? e.dashCd : 0;
       if (e.dashing > 0) {
         e.dashing -= dt;
         e.x += e.dashDirX * e.dashSpeed * dt;
@@ -346,6 +386,8 @@ export function updateEnemies(enemies, player, dt, elapsed = 0) {
         e.dashDirX = toPlayer.x;
         e.dashDirY = toPlayer.y;
         e.dashCd = 1.1 + Math.random() * 0.7;
+        e.angle = Math.atan2(toPlayer.y, toPlayer.x);
+      } else if (e.coiling > 0) {
         e.angle = Math.atan2(toPlayer.y, toPlayer.x);
       } else {
         e.x += toPlayer.x * e.speed * dt;
@@ -357,11 +399,13 @@ export function updateEnemies(enemies, player, dt, elapsed = 0) {
       e.phase += dt * (ENEMY.spinner.orbit || 2);
       const sideX = -toPlayer.y;
       const sideY = toPlayer.x;
-      const vx = toPlayer.x * 0.55 + sideX * Math.sin(e.phase) * 0.9;
-      const vy = toPlayer.y * 0.55 + sideY * Math.sin(e.phase) * 0.9;
+      const orbit = 0.78 + 0.22 * Math.sin(e.phase);
+      const vx = toPlayer.x * 0.28 + sideX * orbit;
+      const vy = toPlayer.y * 0.28 + sideY * orbit;
       const n = normalize(vx, vy);
       e.x += n.x * e.speed * dt;
       e.y += n.y * e.speed * dt;
+      e.angle = Math.atan2(n.y, n.x);
       e.spin += dt * 9;
     } else if (e.type === "splitter" || e.type === "splitterChild") {
       e.x += toPlayer.x * e.speed * dt;

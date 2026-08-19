@@ -332,6 +332,21 @@ test("enemy seeks player over time", () => {
   assert.ok(dist1 < dist0, `should approach player ${dist0} -> ${dist1}`);
 });
 
+test("approach-hold keeps a shared heading for a beat", () => {
+  const player = createPlayer(WORLD_W / 2, WORLD_H / 2);
+  const e = spawnEnemy("wanderer", 0);
+  e.x = 80;
+  e.y = 80;
+  e.enter = 1;
+  e.approach = { x: 1, y: 0 };
+  e.approachTime = 0.4;
+  const x0 = e.x;
+  const y0 = e.y;
+  for (let i = 0; i < 18; i++) updateEnemies([e], player, 1 / 60);
+  assert.ok(e.x > x0 + 8, `should drift along approach x ${x0} -> ${e.x}`);
+  assert.ok(Math.abs(e.y - y0) < 6, `must not peel toward player yet, dy=${e.y - y0}`);
+});
+
 // --- Phrase director / formations ---
 test("opening phrase is wanderer-only readable patterns", async () => {
   const {

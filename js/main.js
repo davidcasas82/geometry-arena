@@ -705,7 +705,11 @@ function showPathResultUI(result) {
   pathObjStat?.classList.remove("hot");
 
   const fill = pathResultWord?.querySelector?.(".path-result-fill") || pathResultWord;
-  if (fill) fill.textContent = cleared ? "CLEAR" : "FAIL";
+  if (fill) {
+    const word = cleared ? "CLEAR" : "FAIL";
+    fill.textContent = word;
+    fill.setAttribute("data-stamp", word);
+  }
   pathResult?.classList.toggle("is-fail", !cleared);
   pathResult?.classList.toggle("is-clear", cleared);
   if (pathResultTag) pathResultTag.textContent = (level?.name || "PATH").toUpperCase();

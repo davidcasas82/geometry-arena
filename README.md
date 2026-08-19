@@ -64,14 +64,14 @@ See honest gap scores vs the real game: [`docs/VS_GEOMETRY_WARS.md`](docs/VS_GEO
 
 | Shape | Behavior |
 |-------|----------|
-| Green wanderer | Slow seek |
-| Cyan diamond | Fast seek |
-| Pink square | Creep then dash |
-| Purple spinner | Orbit approach |
-| Purple splitter | Dies into 2 children |
-| Pink snake | Multi-segment weaver |
-| Orange tank | Slow, 3 HP |
-| Void (black hole) | Pulls you in, spawns atoms |
+| Spore (ice drone) | Slow pack-seek |
+| Thorn (jade spear) | Lane-charge seek |
+| Jaw (coral) | Creep, coil, then bite |
+| Gyro (lilac blades) | Orbit approach |
+| Rift (cracked tablet) | Dies into 2 shards |
+| Lash (coral whip) | Multi-segment weaver |
+| Slab (amber brick) | Slow, 3 HP |
+| Maw (ink blot) | Pulls you in, sheds shards |
 
 Scoop **geoms** to raise multiplier. Death soft-resets mult (keeps a recovery seed).
 

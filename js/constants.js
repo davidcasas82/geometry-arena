@@ -118,6 +118,10 @@ export const PHRASE = {
   FLOOD_PER_CORNER: 4,
   /** Min distance from player for any job spawn point */
   SAFE_SPAWN_DIST: 110,
+  /** Hold shared formation heading after spawn (seconds) */
+  APPROACH_OPENING: 1.15,
+  APPROACH_NORMAL: 0.78,
+  APPROACH_CIRCLE: 0.5,
   /** Lull multipliers by phrase intensity tag */
   LULL_SCALE: {
     soft: 1.2,
@@ -438,8 +442,9 @@ export const COLORS = {
   playerGlow: "#2fd39a",
   playerCore: "#fff4dc",
   bullet: "#fff4dc",
-  bulletCore: "#ffd23a",
-  wanderer: "#2fd39a",
+  bulletCore: "#fff4dc",
+  bulletTail: "#ff4d4d",
+  wanderer: "#5ad4ff",
   diamond: "#1f9a7a",
   spinner: "#c9b8e0",
   tank: "#e8a020",
@@ -468,6 +473,7 @@ export const ENEMY = {
     score: 100,
     color: COLORS.wanderer,
     geoms: 1,
+    packRange: 86,
   },
   diamond: {
     type: "diamond",
@@ -477,6 +483,7 @@ export const ENEMY = {
     score: 150,
     color: COLORS.diamond,
     geoms: 1,
+    commit: 0.35,
   },
   pink: {
     type: "pink",
@@ -487,6 +494,7 @@ export const ENEMY = {
     score: 175,
     color: COLORS.pink,
     geoms: 1,
+    coil: 0.2,
   },
   spinner: {
     type: "spinner",
@@ -546,6 +554,7 @@ export const ENEMY = {
     geoms: 5,
     pull: 75,
     spawnInterval: 2.6,
+    drawScale: 1.48,
   },
   atom: {
     type: "atom",
