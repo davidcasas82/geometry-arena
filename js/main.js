@@ -2,6 +2,8 @@ import { Game } from "./game.js";
 import {
   applyGfxQuality,
   GFX,
+  MULT_FOR_DUAL,
+  MULT_FOR_TRIPLE,
   preferMobileGraphics,
   resolveGfxQuality,
 } from "./constants.js";
@@ -56,6 +58,9 @@ const goTimeEl = document.getElementById("go-time");
 const goBestEl = document.getElementById("go-best");
 const goMetaEl = document.getElementById("go-meta");
 const goRunsEl = document.getElementById("go-runs");
+const gunLabelEl = document.getElementById("gun-label");
+const lifeMeterEl = document.getElementById("life-meter");
+const bombMeterEl = document.getElementById("bomb-meter");
 const splash = document.getElementById("splash");
 const touchControls = document.getElementById("touch-controls");
 const portraitHint = document.getElementById("portrait-hint");
@@ -793,6 +798,20 @@ const ui = {
     multEl.textContent = `×${Math.floor(n)}`;
     multEl.parentElement?.classList.toggle("hot", n >= 10);
     multEl.parentElement?.classList.toggle("blazing", n >= 40);
+    this.updateGun?.(n);
+  },
+  updateGun(n) {
+    if (!gunLabelEl) return;
+    const m = Math.floor(n || 1);
+    if (m >= MULT_FOR_TRIPLE) gunLabelEl.textContent = "Triple";
+    else if (m >= MULT_FOR_DUAL) gunLabelEl.textContent = "Dual";
+    else gunLabelEl.textContent = `Needle · ${MULT_FOR_DUAL}`;
+  },
+  updateEconomy(data) {
+    const lifeI = lifeMeterEl?.querySelector("i");
+    const bombI = bombMeterEl?.querySelector("i");
+    if (lifeI) lifeI.style.width = `${Math.round((data?.lifeFrac || 0) * 100)}%`;
+    if (bombI) bombI.style.width = `${Math.round((data?.bombFrac || 0) * 100)}%`;
   },
   updateLives(n) {
     livesEl.textContent = String(n);
@@ -956,7 +975,9 @@ if (level && pathObjectiveEl) {
     if (goMetaEl) {
       const deaths = data.deaths ?? 0;
       const level = data.level ?? 1;
-      goMetaEl.textContent = `LVL ${level}  ·  ${deaths} DEATH${deaths === 1 ? "" : "S"}`;
+      const bits = [`HEAT ${level}`, `${deaths} DEATH${deaths === 1 ? "" : "S"}`];
+      if (data.autopsy) bits.push(data.autopsy);
+      goMetaEl.textContent = bits.join("  ·  ");
     }
     if (goRunsEl) {
       const summary = (data.runsSummary || "").trim();

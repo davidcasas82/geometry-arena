@@ -113,6 +113,10 @@ export function jobsForPattern(pattern, types, count, opts = {}, game = null) {
   const corner = opts.corner != null ? opts.corner : Math.floor(Math.random() * 4);
   const axis = opts.axis === "vertical" ? "vertical" : "horizontal";
   const perSide = opts.perSide != null ? opts.perSide : Math.max(2, Math.ceil(n / 4));
+  const arena = game?.arena || null;
+  const worldArg = arena
+    ? { worldW: arena.worldW, worldH: arena.worldH, arena }
+    : undefined;
 
   const paint = (jobs) => {
     if (!jobs.length) return jobs;
@@ -127,31 +131,49 @@ export function jobsForPattern(pattern, types, count, opts = {}, game = null) {
   switch (pattern) {
     case SPAWN_PATTERN.EDGE_LINE:
     case "edge_line":
-      jobs = formationEdgeLine(list[0], n, /** @type {0|1|2|3} */ (side), stagger ?? 0.08);
+      jobs = formationEdgeLine(
+        list[0],
+        n,
+        /** @type {0|1|2|3} */ (side),
+        stagger ?? 0.08,
+        worldArg
+      );
       break;
     case SPAWN_PATTERN.COLUMN:
     case "column":
-      jobs = formationColumn(list[0], n, /** @type {0|1|2|3} */ (side), stagger ?? 0.14);
+      jobs = formationColumn(
+        list[0],
+        n,
+        /** @type {0|1|2|3} */ (side),
+        stagger ?? 0.14,
+        worldArg
+      );
       break;
     case SPAWN_PATTERN.CORNER_ARC:
     case "corner_arc":
-      jobs = formationCornerArc(list[0], n, /** @type {0|1|2|3} */ (corner), stagger ?? 0.07);
+      jobs = formationCornerArc(
+        list[0],
+        n,
+        /** @type {0|1|2|3} */ (corner),
+        stagger ?? 0.07,
+        worldArg
+      );
       break;
     case SPAWN_PATTERN.PINCER:
     case "pincer": {
       const per = Math.max(2, Math.ceil(n / 2));
-      jobs = formationPincer(list[0], per, axis, stagger ?? 0.06);
+      jobs = formationPincer(list[0], per, axis, stagger ?? 0.06, worldArg);
       if (jobs.length > n) jobs = jobs.slice(0, n);
       break;
     }
     case SPAWN_PATTERN.RING:
     case "ring":
-      jobs = formationRing(list[0], perSide, stagger ?? 0.05);
+      jobs = formationRing(list[0], perSide, stagger ?? 0.05, worldArg);
       if (jobs.length > n) jobs = jobs.slice(0, n);
       break;
     case SPAWN_PATTERN.ZIPPER:
     case "zipper":
-      jobs = formationZipper(list[0], n, stagger ?? 0.1);
+      jobs = formationZipper(list[0], n, stagger ?? 0.1, worldArg);
       break;
     case SPAWN_PATTERN.SINGLE:
     case "single":
@@ -192,7 +214,13 @@ export function jobsForPattern(pattern, types, count, opts = {}, game = null) {
       if (jobs.length > n) jobs = jobs.slice(0, n);
       break;
     default:
-      jobs = formationEdgeLine(list[0], n, /** @type {0|1|2|3} */ (side), stagger ?? 0.08);
+      jobs = formationEdgeLine(
+        list[0],
+        n,
+        /** @type {0|1|2|3} */ (side),
+        stagger ?? 0.08,
+        worldArg
+      );
       break;
   }
 
@@ -399,9 +427,14 @@ function checkpointController() {
         state = "lost";
         return;
       }
-      if (globalFail != null && ctx.elapsed >= globalFail && index < cps.length) {
-        state = "lost";
-        ctx.flags.add("timeout");
+      if (globalFail != null && ctx.elapsed >= globalFail) {
+        if (index >= cps.length && cps.length > 0) {
+          state = "won";
+          ctx.flags.add("all-gates");
+        } else {
+          state = "lost";
+          ctx.flags.add("timeout");
+        }
         return;
       }
 
@@ -443,6 +476,9 @@ function checkpointController() {
             1.15
           );
         }
+        if (typeof ctx.game?._gatePulse === "function" && zone) {
+          ctx.game._gatePulse(zone.x, zone.y, zone.r || 70);
+        }
         if (bonus > 0 && typeof ctx.game?._addScore === "function") {
           ctx.game._addScore(
             bonus,
@@ -459,8 +495,11 @@ function checkpointController() {
       }
 
       if (index >= cps.length && cps.length > 0) {
-        state = "won";
         ctx.flags.add("all-gates");
+        // Clock is the 1★ win. Visiting early must not end the level.
+        if (globalFail == null) {
+          state = "won";
+        }
       }
     },
     onPlayerDeath(ctx) {
@@ -475,12 +514,14 @@ function checkpointController() {
       const next = cps[index];
       const due = next?.dueSec != null ? Math.max(0, next.dueSec - ctx.elapsed) : 0;
       const name = next?.label || `GATE ${index + 1}`;
+      const left =
+        globalFail != null ? Math.max(0, globalFail - ctx.elapsed) : 0;
       return {
         timer: formatClock(ctx.elapsed),
         objective:
           index >= cps.length
-            ? `GATE ${total}/${total}`
-            : `${name} ${formatClock(due)}`,
+            ? `SURVIVE ${formatClock(left)}`
+            : `${name} ${formatClock(due)} · ${index}/${total}`,
         wave: next?.label ? next.label : undefined,
         label: ctx.level?.name || "CHECKPOINT",
       };
@@ -573,6 +614,19 @@ function wavesController() {
       if (phase === "delay") {
         phaseT -= dt;
         if (phaseT > 0) return;
+        if (g.arena?.params) {
+          g.arena.params.sealed = !!wave.seal;
+          if (wave.seal && typeof g._shoveIntoPlayable === "function") {
+            g._shoveIntoPlayable();
+            g.particles?.floater?.(
+              g.player?.x,
+              g.player?.y - 64,
+              "SEALED",
+              "#ff4d4d",
+              1.25
+            );
+          }
+        }
         const jobs = jobsForPattern(
           wave.pattern,
           wave.types,
@@ -635,6 +689,7 @@ function wavesController() {
           );
         }
         wi += 1;
+        if (g.arena?.params) g.arena.params.sealed = false;
         if (wi >= waves.length) {
           phase = "idle";
           return;
@@ -683,6 +738,7 @@ function bossLiteController() {
   let bossSpawned = false;
   let bossDead = false;
   let addAcc = 0;
+  let phase = 1;
   /** @type {number|null} */
   let failSafe = null;
 
@@ -694,6 +750,7 @@ function bossLiteController() {
       bossSpawned = false;
       bossDead = false;
       addAcc = 0;
+      phase = 1;
       failSafe =
         ctx.level?.rules?.durationSec != null
           ? Number(ctx.level.rules.durationSec)
@@ -770,6 +827,13 @@ function bossLiteController() {
         if (bossEnemy) {
           g._pathBossSeen = true;
           g.pathBossAlive = true;
+          const maxHp = Math.max(1, bossEnemy.maxHp || bossDef.hp || bossEnemy.hp || 1);
+          const ratio = (bossEnemy.hp || 0) / maxHp;
+          const nextPhase = ratio > 2 / 3 ? 1 : ratio > 1 / 3 ? 2 : 3;
+          if (nextPhase !== phase) {
+            phase = nextPhase;
+            if (typeof g._setBossPhase === "function") g._setBossPhase(phase);
+          }
         } else if (
           g.pathBossKilled ||
           (g._pathBossSeen && !(g.spawnQueue || []).some((j) => j.boss))
@@ -782,13 +846,29 @@ function bossLiteController() {
 
       if (bossSpawned && !bossDead && bossDef.adds) {
         addAcc += dt;
-        const every = Math.max(1, Number(bossDef.adds.everySec) || 6);
+        const addSpec =
+          phase === 3
+            ? {
+                everySec: 3.5,
+                types: ["pink", "wanderer"],
+                count: 10,
+                pattern: SPAWN_PATTERN.PLAYER_CIRCLE,
+              }
+            : phase === 2
+              ? {
+                  everySec: 4,
+                  types: ["diamond", "pink"],
+                  count: 8,
+                  pattern: SPAWN_PATTERN.PINCER,
+                }
+              : bossDef.adds;
+        const every = Math.max(1, Number(addSpec.everySec) || 6);
         if (addAcc >= every) {
           addAcc -= every;
           const jobs = jobsForPattern(
-            bossDef.adds.pattern,
-            bossDef.adds.types,
-            bossDef.adds.count,
+            addSpec.pattern,
+            addSpec.types,
+            addSpec.count,
             {},
             g
           ).map((j) => ({ ...j, pathTag: "adds", pathScripted: true }));
@@ -831,9 +911,17 @@ function bossLiteController() {
     /** @param {ModeContext} ctx */
     getHud(ctx) {
       const label = ctx.level?.rules?.boss?.label || "BOSS";
+      const boss = (ctx.game?.enemies || []).find((e) => e.pathBoss || e.boss);
+      const hp = boss
+        ? `${Math.max(0, Math.ceil(boss.hp))}/${Math.ceil(boss.maxHp || boss.hp || 1)}`
+        : "";
       return {
         timer: formatClock(ctx.elapsed),
-        objective: bossDead ? "CLEAR ADDS" : label,
+        objective: bossDead
+          ? "CLEAR ADDS"
+          : hp
+            ? `${label} ${hp}  P${phase}`
+            : label,
         label: ctx.level?.name || "BOSS",
       };
     },

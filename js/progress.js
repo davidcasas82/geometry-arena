@@ -15,7 +15,7 @@ import {
 } from "./levels.js";
 
 export const PROGRESS_KEY = "geometry-arena-path-progress";
-export const PROGRESS_VERSION = 2;
+export const PROGRESS_VERSION = 3;
 
 /**
  * @typedef {import('./levels.js').PathProgress} PathProgress
@@ -45,7 +45,7 @@ export function loadProgress() {
     if (!raw) return emptyProgress();
     const parsed = JSON.parse(raw);
     const p = normalizeProgress(parsed);
-    // v2: topologies + gate rules invalidate old stars. Wipe once.
+    // v3: Path win/star retune (no sprint clears). Wipe older schemas.
     if (p.version !== PROGRESS_VERSION) {
       const fresh = emptyProgress();
       saveProgress(fresh);

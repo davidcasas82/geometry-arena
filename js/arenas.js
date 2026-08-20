@@ -322,7 +322,19 @@ export function pickSpawnEdge(arena, rng = Math.random) {
       : { x: a.worldW + m, y: u * a.worldH, side };
   }
 
-  // rect / donut / wrap_torus / default — world edges
+  if (a.topology === "donut") {
+    const innerR = Math.max(20, Number(a.params.innerR) || 150);
+    const outer = Math.min(b.w, b.h) * 0.5 - 8;
+    const ang = (side * Math.PI) / 2 + (u - 0.5) * 1.2;
+    const rad = outer + m * 0.25;
+    return {
+      x: a.cx + Math.cos(ang) * rad,
+      y: a.cy + Math.sin(ang) * rad,
+      side,
+    };
+  }
+
+  // rect / wrap_torus / default — world edges
   if (side === 0) return { x: u * a.worldW, y: -m, side };
   if (side === 1) return { x: u * a.worldW, y: a.worldH + m, side };
   if (side === 2) return { x: -m, y: u * a.worldH, side };
@@ -394,10 +406,14 @@ export function drawArena(ctx, arena, opts = {}) {
   const topology = arena.topology;
 
   // rect / wrap: rim is already drawn by drawGrid — optional subtle torus cue
-  if (topology === "rect") return;
+  if (topology === "rect") {
+    drawResiduePosts(ctx, arena, t);
+    return;
+  }
 
   if (topology === "wrap_torus") {
     drawTorusCues(ctx, arena, t);
+    drawResiduePosts(ctx, arena, t);
     return;
   }
 
@@ -419,6 +435,22 @@ export function drawArena(ctx, arena, opts = {}) {
     drawSplitWall(ctx, arena, t);
   }
 
+  ctx.restore();
+  drawResiduePosts(ctx, arena, t);
+}
+
+function drawResiduePosts(ctx, arena, t = 0) {
+  const posts = arena?.residue;
+  if (!posts || !posts.length || !ctx) return;
+  const pulse = 0.7 + 0.3 * Math.sin(t * 5);
+  ctx.save();
+  for (const p of posts) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r || 24, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(18, 16, 28, 0.92)";
+    ctx.fill();
+    neonStroke(ctx, COLORS.danger, 1.4, 8, 0.45 * pulse);
+  }
   ctx.restore();
 }
 
@@ -519,6 +551,13 @@ export function drawMorphDanger(ctx, current, next, progress = 0, t = 0) {
 // ── Internal geometry ────────────────────────────────────────
 
 function pointInSolid(arena, x, y) {
+  if (arena.residue && arena.residue.length) {
+    for (const p of arena.residue) {
+      const dx = x - p.x;
+      const dy = y - p.y;
+      if (dx * dx + dy * dy <= (p.r || 24) * (p.r || 24)) return true;
+    }
+  }
   const { topology, worldW, worldH, playableBounds: b, cx, cy, params } = arena;
 
   if (topology === "wrap_torus") return false;
@@ -626,7 +665,9 @@ function clampToCross(arena, x, y, r) {
 }
 
 function pointInSplitWall(arena, x, y) {
-  const gap = Math.max(40, Number(arena.params.gap) || 160);
+  const gap = arena.params.sealed
+    ? 0
+    : Math.max(40, Number(arena.params.gap) || 160);
   const thick = Math.max(16, Number(arena.params.wallThickness) || 48);
   const axis = arena.params.axis === "x" ? "x" : "y";
   const halfGap = gap * 0.5;
@@ -871,7 +912,9 @@ function roundRectPath(ctx, x, y, w, h, rad) {
 }
 
 function drawSplitWall(ctx, arena, t) {
-  const gap = Math.max(40, Number(arena.params.gap) || 160);
+  const gap = arena.params.sealed
+    ? 0
+    : Math.max(40, Number(arena.params.gap) || 160);
   const thick = Math.max(16, Number(arena.params.wallThickness) || 48);
   const axis = arena.params.axis === "x" ? "x" : "y";
   const halfGap = gap * 0.5;

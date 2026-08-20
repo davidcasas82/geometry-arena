@@ -173,6 +173,26 @@ body {
   line-height: 1.15;
 }
 
+.stat-meter {
+  display: block;
+  height: 4px;
+  margin-top: 6px;
+  background: rgba(255, 244, 220, 0.12);
+  border: 1px solid #000;
+  overflow: hidden;
+}
+
+.stat-meter i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--jade);
+}
+
+.stat.bomb-stat .stat-meter i {
+  background: var(--coral);
+}
+
 .stat.accent .stat-value {
   color: var(--amber);
 }

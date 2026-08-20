@@ -500,7 +500,7 @@ test("AFK does not auto-complete Cross Gates", async () => {
   assert.equal(mode.getState(ctx), "lost", "timeout with gates remaining is a fail");
 });
 
-test("visiting Cross Gates zones in order wins", async () => {
+test("visiting Cross Gates zones early does not win", async () => {
   const { getLevel } = await import(js("levels.js"));
   const { createModeController } = await import(js("modes.js"));
   const level = getLevel("path-04-cross-gates");
@@ -512,6 +512,7 @@ test("visiting Cross Gates zones in order wins", async () => {
     enemies: [],
     spawnQueue: [],
     _addScore() {},
+    _gatePulse() {},
   };
   const ctx = {
     game,
@@ -525,11 +526,14 @@ test("visiting Cross Gates zones in order wins", async () => {
   for (const cp of level.rules.checkpoints) {
     game.player.x = cp.zone.x;
     game.player.y = cp.zone.y;
-    ctx.elapsed = cp.dueSec - 1;
+    ctx.elapsed = Math.max(1, cp.dueSec - 1);
     mode.onUpdate(ctx, 0.1);
   }
-  assert.equal(mode.getState(ctx), "won");
+  assert.equal(mode.getState(ctx), "playing", "sprint must not clear the level");
   assert.equal(game.pathOnTimeGates, 4);
+  ctx.elapsed = level.rules.durationSec;
+  mode.onUpdate(ctx, 0.1);
+  assert.equal(mode.getState(ctx), "won", "clock + all gates is the win");
 });
 
 test("star gap names the missing family", async () => {
@@ -539,7 +543,59 @@ test("star gap names the missing family", async () => {
   const stars = computeStars(level, 90000, extra);
   assert.equal(stars, 1, "peakMult 8 blocks 2★ even if score clears 80k");
   const gap = describeStarGap(level, 90000, extra, stars);
-  assert.ok(/NEED ×20/.test(gap), gap);
+  assert.ok(/NEED ×15/.test(gap), gap);
+});
+
+test("Path deadline target is a real clock, not a pop-quiz", async () => {
+  const { getLevel } = await import(js("levels.js"));
+  const level = getLevel("path-02-deadline-drill");
+  assert.ok(level.rules.targetScore >= 200000, "target too low");
+  assert.equal(level.rules.durationSec, 60);
+});
+
+test("Path waves last longer than a sweep", async () => {
+  const { getLevel } = await import(js("levels.js"));
+  const lane = getLevel("path-03-wave-lane");
+  const split = getLevel("path-06-split-signal");
+  const laneN = lane.rules.waves.reduce((s, w) => s + w.count, 0);
+  const splitN = split.rules.waves.reduce((s, w) => s + w.count, 0);
+  assert.ok(lane.rules.waves.length >= 8, "wave lane too short");
+  assert.ok(laneN >= 45, `wave lane count ${laneN}`);
+  assert.ok(split.rules.waves.length >= 8, "split too short");
+  assert.ok(splitN >= 50, `split count ${splitN}`);
+  assert.equal(split.rules.waves.some((w) => w.seal), true);
+});
+
+test("Boss Pulse is a set piece, not a slab", async () => {
+  const { getLevel } = await import(js("levels.js"));
+  const { BOSS_BOMB_CHIP } = await import(js("constants.js"));
+  const level = getLevel("path-08-boss-pulse");
+  assert.ok(level.rules.boss.hp >= 80, "boss HP too low");
+  assert.ok(BOSS_BOMB_CHIP <= 3, "bomb must not delete the elite");
+  assert.ok(level.rules.boss.hp > BOSS_BOMB_CHIP * 3, "three bombs cannot skip the fight");
+});
+
+test("Classic morph cycle includes verb shapes", async () => {
+  const { MORPH } = await import(js("constants.js"));
+  const ids = MORPH.SHAPES.map((s) => s.topology);
+  assert.ok(ids.includes("donut"));
+  assert.ok(ids.includes("split"));
+  assert.ok(ids.includes("wrap_torus"));
+  assert.equal(MORPH.FIRST_AT, 48);
+  assert.equal(MORPH.INTERVAL, 22);
+});
+
+test("death seed cap can keep dual", async () => {
+  const { DEATH_MULT_KEEP, DEATH_MULT_KEEP_CAP, MULT_FOR_DUAL } = await import(
+    js("constants.js")
+  );
+  const prev = 220;
+  const keep = Math.min(
+    Math.floor(prev * DEATH_MULT_KEEP),
+    DEATH_MULT_KEEP_CAP,
+    Math.floor(prev * 0.5)
+  );
+  assert.ok(keep >= MULT_FOR_DUAL, `keep ${keep} should hold dual`);
 });
 
 function makeInputWithKeys(codes) {

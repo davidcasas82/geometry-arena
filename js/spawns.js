@@ -70,7 +70,9 @@ function offsetJobs(jobs, delayAdd) {
  * @param {number} [worldH]
  */
 export function formationEdgeLine(type, count, side, stagger = 0.08, worldW = WORLD_W, worldH = WORLD_H) {
+  let arena = null;
   if (worldW && typeof worldW === "object") {
+    arena = worldW.arena || null;
     const d = dimsOf(worldW.worldW ?? worldW.arena?.worldW, worldW.worldH ?? worldW.arena?.worldH);
     worldW = d.worldW;
     worldH = d.worldH;
@@ -79,6 +81,12 @@ export function formationEdgeLine(type, count, side, stagger = 0.08, worldW = WO
     worldW = d.worldW;
     worldH = d.worldH;
   }
+  const b = arena?.playableBounds;
+  const useLane =
+    b &&
+    (arena.topology === "corridor" ||
+      arena.topology === "rect_tight" ||
+      arena.topology === "rect_wide");
   /** @type {SpawnJob[]} */
   const jobs = [];
   const n = Math.max(2, count);
@@ -87,7 +95,21 @@ export function formationEdgeLine(type, count, side, stagger = 0.08, worldW = WO
     const u = 0.08 + t * 0.84;
     let x;
     let y;
-    if (side === 0) {
+    if (useLane) {
+      if (side === 0) {
+        x = b.x + u * b.w;
+        y = b.y - MARGIN;
+      } else if (side === 1) {
+        x = b.x + u * b.w;
+        y = b.y + b.h + MARGIN;
+      } else if (side === 2) {
+        x = b.x - MARGIN;
+        y = b.y + u * b.h;
+      } else {
+        x = b.x + b.w + MARGIN;
+        y = b.y + u * b.h;
+      }
+    } else if (side === 0) {
       x = u * worldW;
       y = -MARGIN;
     } else if (side === 1) {

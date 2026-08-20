@@ -44,6 +44,9 @@ import {
   SPAWN_INTERVAL_START,
   SPAWN_RAMP_SECONDS,
   SPAWN_TABLE,
+  SPAWN_LATE_AT,
+  SPAWN_LATE_WEIGHTS,
+  BOSS_BOMB_CHIP,
   START_BOMBS,
   START_LIVES,
   WAVE_LULL_MIN,
@@ -235,6 +238,7 @@ export class Game {
     this.ui.updateBombs?.(START_BOMBS);
     this.ui.updateBest(this.best);
     this.ui.updateLevel?.(1);
+    this.ui.updateGun?.(1);
 
     this._loop = this._loop.bind(this);
     this.raf = requestAnimationFrame(this._loop);
@@ -379,8 +383,12 @@ start(opts = {}) {
     this.bombFlash = 0;
     this.nextLifeAt = EXTRA_LIFE_EVERY;
     this.nextBombAt = EXTRA_BOMB_EVERY;
+    this.prevLifeAt = 0;
+    this.prevBombAt = 0;
     this.livesAwarded = 0;
     this.progress = 0;
+    this._streamAnnounced = 0;
+    this._wrapTaught = false;
     this.peakMult = 1;
     this.deathCount = 0;
     this.afterimages = [];
@@ -411,6 +419,7 @@ start(opts = {}) {
     this.ui.updateLives(this.lives);
     this.ui.updateBombs?.(this.bombs);
     this.ui.updateLevel?.(1);
+    this._pushEconomyHud();
     this.fitCanvas();
     this.input.requestPointerLock();
     // Brief thruster intro so PLAY feels like the ship wakes up
@@ -463,6 +472,7 @@ this.modeFlags = new Set();
     this.morphNextRef = null;
     this.morphNextArena = null;
     this.morphFlash = 0;
+    this.morphResidue = [];
   }
 
 /**
@@ -471,10 +481,120 @@ this.modeFlags = new Set();
  */
   setArena(arenaRef) {
     const arena = createArena(arenaRef || { topology: "rect" });
+    if (this.morphResidue && this.morphResidue.length) {
+      arena.residue = this.morphResidue;
+    }
     this.arena = arena;
     this.world = { w: arena.worldW, h: arena.worldH };
     setEntityArena(arena);
     return arena;
+  }
+
+  _shoveIntoPlayable() {
+    if (!this.arena) return;
+    if (this.player && hitsSolid(this.arena, this.player.x, this.player.y, this.player.r)) {
+      try {
+        const pt = randomPlayablePoint(this.arena, Math.random, this.player.r || 13);
+        if (pt) {
+          this.player.x = pt.x;
+          this.player.y = pt.y;
+        }
+      } catch {
+        /* keep */
+      }
+    }
+    for (const e of this.enemies || []) {
+      if (e.dead) continue;
+      if (hitsSolid(this.arena, e.x, e.y, e.r || 10)) {
+        try {
+          const pt = randomPlayablePoint(this.arena, Math.random, e.r || 10);
+          if (pt) {
+            e.x = pt.x;
+            e.y = pt.y;
+          }
+        } catch {
+          /* keep */
+        }
+      }
+    }
+  }
+
+  /**
+   * Leave ink posts in the newly committed shape (Tormentor-style residue).
+   * Posts last until the next morph. Never spawn on the ship.
+   */
+  _seedMorphResidue(prevArena, nextArena) {
+    this.morphResidue = [];
+    const next = nextArena;
+    if (!next || !MORPH.RESIDUE_COUNT) return;
+    const n = Math.max(0, MORPH.RESIDUE_COUNT | 0);
+    const r = Math.max(16, MORPH.RESIDUE_RADIUS || 30);
+    const px = this.player?.x ?? next.cx;
+    const py = this.player?.y ?? next.cy;
+    const posts = [];
+    for (let i = 0; i < 24 && posts.length < n; i++) {
+      let pt = null;
+      try {
+        pt = randomPlayablePoint(next, Math.random, r + 4);
+      } catch {
+        pt = null;
+      }
+      if (!pt) continue;
+      if (Math.hypot(pt.x - px, pt.y - py) < 160) continue;
+      if (posts.some((p) => Math.hypot(p.x - pt.x, p.y - pt.y) < r * 3)) continue;
+      posts.push({ x: pt.x, y: pt.y, r });
+    }
+    this.morphResidue = posts;
+  }
+
+  /**
+   * Checkpoint gate: local clear, no score, no bomb spend (GW Pacifism DNA).
+   */
+  _gatePulse(x, y, r = 70) {
+    const radius = Math.max(140, (r || 70) * 2.4);
+    this.particles.shockwave(x, y, COLORS.playerGlow || "#2fd39a", radius);
+    this.particles.ring(x, y, COLORS.playerGlow || "#2fd39a", 24, radius);
+    this._gridPulse(x, y, 2.6);
+    this.audio.extraBomb();
+    for (const e of this.enemies) {
+      if (e.pathBoss || e.boss) continue;
+      if (Math.hypot(e.x - x, e.y - y) > radius) continue;
+      e.dead = true;
+      this._onKill(e, { fromBomb: true });
+    }
+    this.enemies = this.enemies.filter((e) => !e.dead);
+  }
+
+  /** Path boss-lite phase change: pinch the floor, then dash. */
+  _setBossPhase(phase) {
+    this.pathBossPhase = phase | 0;
+    const boss = (this.enemies || []).find((e) => e.pathBoss || e.boss);
+    if (phase === 2) {
+      this.setArena({
+        topology: "rect_wide",
+        params: { width: 1180, height: 460 },
+      });
+      this._shoveIntoPlayable();
+      this.particles.floater(
+        this.player.x,
+        this.player.y - 64,
+        "PINCH",
+        COLORS.danger,
+        1.3
+      );
+    }
+    if (phase === 3 && boss) {
+      boss.bossDash = true;
+      boss.speed = (boss.speed || 54) * 1.2;
+      this.particles.floater(
+        this.player.x,
+        this.player.y - 64,
+        "RAGE",
+        COLORS.danger,
+        1.3
+      );
+    }
+    this.audio.levelUp?.();
   }
 
   /**
@@ -520,7 +640,19 @@ this.modeFlags = new Set();
 
   _commitMorph() {
     const nextRef = this.morphNextRef || { topology: "rect" };
+    this._seedMorphResidue(this.arena, this.morphNextArena);
     this.setArena(nextRef);
+    this._shoveIntoPlayable();
+    if (this.arena?.topology === "wrap_torus" && !this._wrapTaught) {
+      this._wrapTaught = true;
+      this.particles.floater(
+        this.player.x,
+        this.player.y - 72,
+        "WRAP — EDGES ARE DOORS",
+        COLORS.player,
+        1.2
+      );
+    }
     this.morphWarn = false;
     this.morphWarnT = 0;
     this.morphNextRef = null;
@@ -665,6 +797,17 @@ this.modeFlags = new Set();
     this.ui.updateTimer?.("");
 
     this.audio.playTheme(getLevelTheme(level), { restart: true });
+
+    if (this.arena?.topology === "wrap_torus") {
+      this._wrapTaught = true;
+      this.particles.floater(
+        this.player.x,
+        this.player.y - 64,
+        "WRAP — EDGES ARE DOORS",
+        COLORS.player,
+        1.25
+      );
+    }
 
     const ctx = this._modeContext();
     this.mode.onEnter(ctx);
@@ -924,6 +1067,12 @@ this.modeFlags = new Set();
     const summary = formatRunsSummary(recent.slice(0, 5));
     // Logo-style game over on the live grid (no boilerplate panel)
     if (typeof this.ui.showGameOver === "function") {
+      const newBest = this.score >= this.best && this.score > 0;
+      const unusedBombs = this.bombs;
+      const autopsyBits = [];
+      if (newBest) autopsyBits.push("NEW BEST");
+      if (unusedBombs > 0) autopsyBits.push(`${unusedBombs} BOMB${unusedBombs === 1 ? "" : "S"} UNUSED`);
+      if (this.mult > 1) autopsyBits.push(`KEEP ×${this.mult}`);
       this.ui.showGameOver({
         score: this.score,
         best: this.best,
@@ -932,6 +1081,9 @@ this.modeFlags = new Set();
         deaths: this.deathCount,
         level: this.level,
         runsSummary: summary,
+        autopsy: autopsyBits.join("  ·  "),
+        newBest,
+        unusedBombs,
         onAgain: () => this.start(),
         onTitle: () => this.returnToMenu(),
       });
@@ -980,6 +1132,7 @@ this.modeFlags = new Set();
       const interval = Math.floor(
         EXTRA_LIFE_EVERY * Math.pow(EXTRA_LIFE_SCALE, this.livesAwarded)
       );
+      this.prevLifeAt = this.nextLifeAt;
       this.nextLifeAt += Math.max(EXTRA_LIFE_EVERY, interval);
       this.livesAwarded += 1;
       if (this.lives < MAX_LIVES) {
@@ -1005,6 +1158,7 @@ this.modeFlags = new Set();
       }
     }
     while (this.progress >= this.nextBombAt) {
+      this.prevBombAt = this.nextBombAt;
       this.nextBombAt += EXTRA_BOMB_EVERY;
       if (this.bombs < MAX_BOMBS) {
         this.bombs += 1;
@@ -1027,6 +1181,56 @@ this.modeFlags = new Set();
         );
       }
     }
+    this._pushEconomyHud();
+  }
+
+  _announceStream(prev, next) {
+    const p = Math.max(1, prev | 0);
+    const n = Math.max(1, next | 0);
+    if (p < MULT_FOR_DUAL && n >= MULT_FOR_DUAL && this._streamAnnounced < 1) {
+      this._streamAnnounced = 1;
+      this.particles.floater(
+        this.player.x,
+        this.player.y - 56,
+        "DUAL STREAM",
+        COLORS.player,
+        1.35
+      );
+      this.audio.extraLife?.();
+    }
+    if (p < MULT_FOR_TRIPLE && n >= MULT_FOR_TRIPLE && this._streamAnnounced < 2) {
+      this._streamAnnounced = 2;
+      this.particles.floater(
+        this.player.x,
+        this.player.y - 56,
+        "TRIPLE STREAM",
+        COLORS.geom,
+        1.45
+      );
+      this.audio.levelUp?.();
+    }
+    this.ui.updateGun?.(n);
+  }
+
+  _pushEconomyHud() {
+    const lifeSpan = Math.max(1, this.nextLifeAt - (this.prevLifeAt || 0));
+    const lifeFrac = Math.max(
+      0,
+      Math.min(1, (this.progress - (this.prevLifeAt || 0)) / lifeSpan)
+    );
+    const bombSpan = Math.max(1, this.nextBombAt - (this.prevBombAt || 0));
+    const bombFrac = Math.max(
+      0,
+      Math.min(1, (this.progress - (this.prevBombAt || 0)) / bombSpan)
+    );
+    this.ui.updateEconomy?.({
+      lifeFrac,
+      bombFrac,
+      nextLife: this.nextLifeAt,
+      nextBomb: this.nextBombAt,
+      progress: this.progress,
+    });
+    this.ui.updateGun?.(this.mult);
   }
 
   /** Geoms are the only way mult climbs (GW RE2). */
@@ -1036,6 +1240,7 @@ this.modeFlags = new Set();
     this.multIdle = 0;
     this.multDecayAcc = 0;
     this.ui.updateMult(this.mult);
+    this._announceStream(before, this.mult);
     if (this.mult <= before) return;
 
     this.particles.floater(
@@ -1140,6 +1345,7 @@ this.modeFlags = new Set();
       this.multDecayAcc -= MULT_DECAY_INTERVAL;
       this.mult -= 1;
       this.ui.updateMult(this.mult);
+      this.ui.updateGun?.(this.mult);
     }
   }
 
@@ -1215,13 +1421,19 @@ this.modeFlags = new Set();
       this.pathLevel && this.pathEnemyUnlockScale != null && this.pathEnemyUnlockScale > 0
         ? this.pathEnemyUnlockScale
         : 1;
-    const table =
+    let table =
       scale === 1
         ? SPAWN_TABLE
         : SPAWN_TABLE.map((row) => ({
             ...row,
             unlockAt: (row.unlockAt || 0) * scale,
           }));
+    if (!this.pathLevel && this.elapsed >= (SPAWN_LATE_AT || 90)) {
+      table = table.map((row) => {
+        const w = SPAWN_LATE_WEIGHTS?.[row.type];
+        return w != null ? { ...row, weight: w } : row;
+      });
+    }
     let type = pickSpawnType(this.elapsed, table);
     const voidCount = this.enemies.filter((e) => e.type === "void").length;
     const voidUnlock =
@@ -1522,7 +1734,8 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     for (const e of this.enemies) {
       if (e.pathBoss || e.boss) {
         // Insurance, not a win button — chip the elite, clear the fodder.
-        e.hp = Math.max(0, (e.hp || 1) - 5);
+        const chip = Math.max(1, BOSS_BOMB_CHIP || 3);
+        e.hp = Math.max(0, (e.hp || 1) - chip);
         this.particles.burst(e.x, e.y, e.color, 28, 340);
         this.particles.ring(e.x, e.y, e.color, 22, 280);
         if (e.hp <= 0) {
@@ -1773,6 +1986,7 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     this.multIdle = 0;
     this.multDecayAcc = 0;
     this.ui.updateMult(this.mult);
+    this.ui.updateGun?.(this.mult);
 
     this.audio.playerHit();
     this.particles.shockwave(this.player.x, this.player.y, COLORS.danger, 380);
@@ -2034,8 +2248,13 @@ const phrase = buildPhrase(this.elapsed, d, () => this._pickType(), {
     updateBullets(this.bullets, dt);
     const { atoms } = updateEnemies(this.enemies, this.player, dt, this.elapsed);
     if (atoms.length) {
+      const atomCap = Math.min(
+        MAX_ENEMIES,
+        this.pathMaxEnemies || MAX_ENEMIES,
+        this._softCap()
+      );
       for (const a of atoms) {
-        if (this.enemies.length < MAX_ENEMIES) this.enemies.push(a);
+        if (this.enemies.length < atomCap) this.enemies.push(a);
       }
     }
     updateGeoms(this.geoms, this.player, dt, this.mult, this.geomVacuum);

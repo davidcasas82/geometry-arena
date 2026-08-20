@@ -55,7 +55,7 @@ See honest gap scores vs the real game: [`docs/VS_GEOMETRY_WARS.md`](docs/VS_GEO
 
 - **Geom mult economy** — +1 ×mult per geom, ceiling 999, idle decay, death soft-keeps mult  
 - **Reactive neon grid**, additive particles, thruster afterimages  
-- **Fire densifies with mult** (rate + dual/triple streams at high ×)  
+- **Fire densifies with mult** — needle until **×45 dual**, **×110 triple** (HUD says so)  
 - **Bombs** — shockwave clear, no points; start 3 / max 5; +1 every **38k** base progress  
 - **Extra lives** — start 3 / max 5; first +life every **32k** base progress (escalates)  
 - **Wave spawn director** (bursts + lulls + formations)

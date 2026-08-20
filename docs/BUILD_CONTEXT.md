@@ -2,7 +2,7 @@
 
 **Purpose:** handoff doc so a new session (human or agent) can resume development without re-discovering architecture, product decisions, and past failure modes.
 
-**Last updated:** 2026-07-26 (Arena Path levels MVP + topologies)  
+**Last updated:** 2026-08-18 (Path win contracts, 3-phase boss, Classic teach + verb morph)  
 **Project root:** `geometry-arena/` (under `My Dev Folder`)  
 **Stack:** vanilla HTML / CSS / ES modules, Canvas 2D, Web Audio SFX + HTMLAudio BGM, `localStorage` only (no backend)
 
@@ -184,7 +184,7 @@ Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu stil
 ### 4. Header HUD
 
 - Top-left: compact chrome **GEOMETRY / ARENA** logo (not generic text / not old brand-mark ship box)
-- Stats: Score, Level, Mult, Lives, Bombs, Best — enlarged for readability
+- Stats: Score, Level, Mult (label = Needle/Dual/Triple), Lives + bomb **meters** (base progress), Best
 
 **UI logic lives in `js/main.js`:** `showTitleMenu()`, `showOverlay()` (interrupts), splash dismiss. Do not reintroduce a frosted “Play + how-to wall” as the default first screen.
 
@@ -196,7 +196,7 @@ Core loop in `Game._loop` (`js/game.js`): update only while `playing`; menu stil
 - **Logo:** Bangers italic cream face, fat black outline, splat energy. Outfit for HUD/body.
 - **Entities:** hover height + ground shadow; enamel fills + ink stroke (not neon glow)
 - **Spawn telegraph:** enemies enter as thick coral ink outlines (`enter < GFX.ENEMY_OUTLINE_END`, ~450ms) — no collision until solidify; then enamel fill
-- **Classic arena morph:** `MORPH` in constants — first warn ~48s, then every ~22s, 2.6s red danger telegraph (`drawMorphDanger`); trap outside next shape = death (CRUSHED). Path levels static.
+- **Classic arena morph:** `MORPH` first warn 48s, every 22s, 2.6s telegraph. Cycle is **verbs** (corridor / donut / cross / split / wrap), not just box size. Commit leaves ink-post residue until the next morph. Path stays static.
 - **Camera:** trauma shake with combat soft-cap + diminishing returns (dense kills don’t pin full earthquake); big events use `{ big: true }`; zoom punch on set pieces; menu camera drift  
 - **Presentation:** ink-wash floor, hairline paper grid, no idle bloom/CA. Paper grade + vignette. Kill debris is ink filaments (`GFX` / `MORPH` in constants)
 - **Accessibility:** `GFX.REDUCED_FLASH = true` by default; damps bomb wash / underlay
@@ -214,8 +214,8 @@ Targets (research-backed): median death ~**90–150s**, scarce extra lives, read
 | Area | Current intent |
 |------|----------------|
 | World | 1600×900 |
-| Lives | start 3, max 5; +life every **20k base progress** |
-| Bombs | start 3, max 5; +bomb every **30k base progress** |
+| Lives | start 3, max 5; +life every **32k base progress** |
+| Bombs | start 3, max 5; +bomb every **38k base progress** |
 | Safe opening | ~20s fodder-only teach window |
 | Spawn ramp | ease-in over ~145s; soft density caps by time |
 | Geoms | small radius ~3.2 (sparkle pickups) |

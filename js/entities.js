@@ -419,9 +419,29 @@ export function updateEnemies(enemies, player, dt, elapsed = 0) {
         e.vy *= 0.9;
       }
     } else if (e.type === "tank") {
-      e.x += toPlayer.x * e.speed * dt;
-      e.y += toPlayer.y * e.speed * dt;
-      e.angle = Math.atan2(toPlayer.y, toPlayer.x);
+      if (e.bossDash) {
+        e.dashCd = (e.dashCd || 0) - dt;
+        if (e.dashing > 0) {
+          e.dashing -= dt;
+          e.x += e.dashDirX * (e.dashSpeed || 240) * dt;
+          e.y += e.dashDirY * (e.dashSpeed || 240) * dt;
+        } else if (e.dashCd <= 0) {
+          e.dashing = 0.28;
+          e.dashDirX = toPlayer.x;
+          e.dashDirY = toPlayer.y;
+          e.dashCd = 0.85 + Math.random() * 0.45;
+          e.dashSpeed = 240;
+          e.angle = Math.atan2(toPlayer.y, toPlayer.x);
+        } else {
+          e.x += toPlayer.x * e.speed * 1.15 * dt;
+          e.y += toPlayer.y * e.speed * 1.15 * dt;
+          e.angle = Math.atan2(toPlayer.y, toPlayer.x);
+        }
+      } else {
+        e.x += toPlayer.x * e.speed * dt;
+        e.y += toPlayer.y * e.speed * dt;
+        e.angle = Math.atan2(toPlayer.y, toPlayer.x);
+      }
       e.spin += dt * 1.2;
     } else if (e.type === "snake") {
       e.phase += dt * 3.5;

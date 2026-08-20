@@ -62,10 +62,10 @@ Survive a route of timed gates; arena topology may funnel the ship.
 
 | | |
 |--|--|
-| **Win** | Reach final checkpoint index (`rules.checkpoints.length - 1`) alive. |
-| **Lose** | Lives → 0, **or** fail a gate if `rules.failOnMissedCheckpoint === true` (MVP default **false**: gates are progress markers, not fail timers). |
-| **Timer** | Optional global `rules.durationSec` fail-safe (null = no global fail timer). Per-gate `dueSec` is **elapsed-from-start** advisory / star pacing, not hard fail unless flagged. |
-| **Checkpoint clear** | When `elapsed >= cp.dueSec` **or** player enters `cp.zone` (circle in world space), mark reached; floater label. |
+| **Win** | Visit every gate **and** survive until `rules.durationSec`. Touching all zones early does **not** end the level. |
+| **Lose** | Lives → 0, **or** timeout with any gate unvisited. `failOnMissedCheckpoint` still fails a late individual gate if set (MVP default **false**). |
+| **Timer** | Global `rules.durationSec` is the 1★ clock. Per-gate `dueSec` is on-time star pacing, not a skip. |
+| **Checkpoint clear** | Player enters `cp.zone`. Local **gate pulse** clears nearby enemies with **no score** (bomb rules). Floater label. |
 | **Scoring** | Standard + small `rules.checkpointBonus` per gate (score only; tiny base progress). |
 | **Stars** | 1★ = finish. 2★/3★ from score and/or gates hit before their `dueSec` (`stars.score`, `stars.onTimeGates`). |
 
@@ -90,7 +90,7 @@ Single elite pressure set piece (not a full GW boss FSM).
 |--|--|
 | **Win** | Defeat `rules.boss.type` (HP depleted) **and** optional add cleanup (`rules.boss.clearAdds === true`). |
 | **Lose** | Lives → 0, or `rules.durationSec` timeout if set. |
-| **Flow** | Intro beat → boss spawn at `rules.boss.spawn` → add phrases on interval from `rules.boss.adds`. |
+| **Flow** | Intro beat → boss spawn → **3 phases** (HP 2/3, 1/3). Phase 2 pinches the arena. Phase 3 dashes. Adds escalate. Bomb chips `BOSS_BOMB_CHIP` (3), never deletes. |
 | **Scoring** | Boss uses enemy score × mult; large trauma on kill. |
 | **Stars** | 1★ = win. 2★/3★ from score, time-to-kill, lives left. |
 
@@ -359,32 +359,32 @@ Unlock: **≥1★ on level N unlocks N+1**. Level 1 always unlocked. Classic Evo
 
 | Order | id | Name | Ch | Mode | Topology | Duration / win | 2★ score | 3★ score | Skill lesson |
 |------:|----|------|---:|------|----------|----------------|---------:|---------:|--------------|
-| 1 | `path-01-grid-wake` | Grid Wake | 1 | evolved | rect | Survive **60s** | 12_000 | 28_000 | Strafe, scoop geoms, trust the needle gun. |
-| 2 | `path-02-deadline-drill` | Deadline Drill | 1 | deadline | rect_tight | **45s** · target **8_000** | 14_000 | 22_000 | Farm mult fast in a small box; don’t corner yourself. |
-| 3 | `path-03-wave-lane` | Wave Lane | 1 | waves | corridor | 5 waves clear | 10_000 | 20_000 | Sweep lines in a lane; respect the long axis. |
-| 4 | `path-04-cross-gates` | Cross Gates | 1 | checkpoint | cross | 4 gates · ~**75s** pace | 15_000 | 30_000 | Hold the hub; clear arms without overcommitting. |
-| 5 | `path-05-donut-orbit` | Donut Orbit | 2 | evolved | donut | Survive **75s** | 22_000 | 45_000 | Orbit the hole; never hug the inner wall blind. |
-| 6 | `path-06-split-signal` | Split Signal | 2 | waves | split | 6 waves clear | 18_000 | 36_000 | Read which chamber is safe; don’t get sealed. |
-| 7 | `path-07-torus-rush` | Torus Rush | 2 | deadline | wrap_torus | **60s** · target **20_000** | 35_000 | 55_000 | Wrap shots and escapes; the edge is a door. |
-| 8 | `path-08-boss-pulse` | Boss Pulse | 2 | boss-lite | rect_wide | Kill tank boss + adds | 25_000 | 50_000 | Prioritize the elite; bomb is insurance, not offense. |
+| 1 | `path-01-grid-wake` | Grid Wake | 1 | evolved | rect | Survive **75s** | 80_000 | 180_000 | Strafe, scoop geoms, trust the needle gun. |
+| 2 | `path-02-deadline-drill` | Deadline Drill | 1 | deadline | rect_tight | **60s** · target **220_000** | 300_000 | 420_000 | Farm mult for the full clock. |
+| 3 | `path-03-wave-lane` | Wave Lane | 1 | waves | corridor | 8 waves clear | 80_000 | 160_000 | Sweep lines in a lane; respect the long axis. |
+| 4 | `path-04-cross-gates` | Cross Gates | 1 | checkpoint | cross | 4 gates **+ survive 95s** | 90_000 | 200_000 | Detonate gates, farm the remaining clock. |
+| 5 | `path-05-donut-orbit` | Donut Orbit | 2 | evolved | donut | Survive **90s** | 200_000 | 400_000 | Orbit the hole; never hug the inner wall blind. |
+| 6 | `path-06-split-signal` | Split Signal | 2 | waves | split | 8 waves + seal | 140_000 | 260_000 | Read which chamber is safe; don’t get sealed. |
+| 7 | `path-07-torus-rush` | Torus Rush | 2 | deadline | wrap_torus | **75s** · target **320_000** | 450_000 | 700_000 | Wrap shots and escapes; the edge is a door. |
+| 8 | `path-08-boss-pulse` | Boss Pulse | 2 | boss-lite | rect_wide | 3-phase 90 HP elite | lives 2/3 | ≤75s | Chip with bombs; survive the pinch. |
 
 ### Per-level rule highlights
 
-**path-01-grid-wake** — `durationSec: 60`, lives 3, bombs 3, full rect, gentle spawn ramp (`spawnRampSec: 55`, `safeOpeningSec: 12`). Stars: score only `[12000, 28000]`; optional peakMult `[8, 15]`.
+**path-01-grid-wake** — `durationSec: 75`, unlock scale 0.7, softCap 16. Stars: score `[80000, 180000]`, peakMult `[15, 35]`.
 
-**path-02-deadline-drill** — `durationSec: 45`, `targetScore: 8000`, lives 3, bombs 2, `rect_tight` ~1100×700. Stars: score `[14000, 22000]`, timeLeftSec `[10, 20]`.
+**path-02-deadline-drill** — `durationSec: 60`, `targetScore: 220000`. Stars: score `[300000, 420000]`, timeLeftSec `[8, 16]`.
 
-**path-03-wave-lane** — corridor axis x; waves: wanderer lines → diamond column → pink pincer → spinner edge → mixed zipper. `waveGapSec: 1.2`. Stars: score `[10000, 20000]`, livesLeft `[2, 3]`.
+**path-03-wave-lane** — 8 corridor waves including snake + splitter + flood. Stars: score `[80000, 160000]`, livesLeft `[2, 3]`.
 
-**path-04-cross-gates** — checkpoints at 15 / 35 / 55 / 75s with hub/arm zones; `checkpointBonus: 400`. Stars: score `[15000, 30000]`, onTimeGates `[3, 4]`.
+**path-04-cross-gates** — visit 4 zones **and** survive 95s. Gate pulse = local clear, no score. Stars: score `[90000, 200000]`, onTimeGates `[3, 4]`.
 
-**path-05-donut-orbit** — `durationSec: 75`, donut `innerR: 150`, denser mid (`softCap: 22`). Stars: score `[22000, 45000]`, peakMult `[12, 25]`.
+**path-05-donut-orbit** — `durationSec: 90`, ring-biased spawns, unlock 1.0. Stars: score `[200000, 400000]`, peakMult `[30, 60]`.
 
-**path-06-split-signal** — six waves alternating chambers via pattern sides; includes one splitter intro. Stars: score `[18000, 36000]`, timeSecMax `[100, 80]` (faster clear better).
+**path-06-split-signal** — 8 waves; `seal: true` on the tank beat. Stars: score `[140000, 260000]`, livesLeft `[2, 3]`.
 
-**path-07-torus-rush** — wrap, `targetScore: 20000`, `durationSec: 60`, lives 2, bombs 2. Stars: score `[35000, 55000]`, timeLeftSec `[8, 18]`.
+**path-07-torus-rush** — wrap, `targetScore: 320000`, `durationSec: 75`, lives 2. Stars: score `[450000, 700000]`, timeLeftSec `[8, 16]`.
 
-**path-08-boss-pulse** — boss tank `hp: 14`, label `PULSE TANK`, adds every 6s wanderer/diamond edge lines; `clearAdds: true`; fail-safe `durationSec: 120`. Stars: score `[25000, 50000]`, livesLeft `[1, 2]`, timeSecMax `[90, 60]`.
+**path-08-boss-pulse** — tank `hp: 90`, 3 phases, bomb chip 3, pinch + dash. Stars: livesLeft `[2, 3]`, timeSecMax `[90, 75]`.
 
 Exact literals live in `js/levels.js` (source of truth for numbers).
 

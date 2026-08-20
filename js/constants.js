@@ -52,7 +52,8 @@ export const EXTRA_BOMB_EVERY = 38000;
  * "needle gun vs full swarm". Still a hard hit — never gain mult.
  */
 export const DEATH_MULT_KEEP = 0.28;
-export const DEATH_MULT_KEEP_CAP = 48;
+/** High enough that a ×200 death can keep dual (45). Triple is still dropped. */
+export const DEATH_MULT_KEEP_CAP = 80;
 
 /** Single needle ~8 shots/sec; mult only trims a little */
 export const BULLET_SPEED = 760;
@@ -64,6 +65,8 @@ export const FIRE_SPREAD = 0.04;
 /** Dual/triple are late mult rewards only */
 export const MULT_FOR_DUAL = 45;
 export const MULT_FOR_TRIPLE = 110;
+/** Path boss-lite: bomb chips this much HP. Never a delete button. */
+export const BOSS_BOMB_CHIP = 3;
 
 export const AIM_SENSITIVITY = 0.055;
 export const AIM_RETICLE_DIST = 56;
@@ -419,17 +422,20 @@ export const MORPH = {
   INTERVAL: 22,
   /** Red flash warning before topology locks */
   WARN_SEC: 2.6,
-  /** Cycle of arena refs (wraps). Keep shapes fair on laptop. */
+  /** Cycle of arena refs. Verbs, not just smaller/bigger boxes. */
   SHAPES: [
     { topology: "rect" },
-    { topology: "rect_tight", params: { width: 1180, height: 700 } },
     { topology: "corridor", params: { axis: "x", halfWidth: 195 } },
+    { topology: "donut", params: { innerR: 140, outerMargin: 36 } },
     { topology: "rect_wide", params: { width: 1520, height: 600 } },
     { topology: "cross", params: { armHalfWidth: 205 } },
-    { topology: "rect_tight", params: { width: 1000, height: 780 } },
-    { topology: "corridor", params: { axis: "y", halfWidth: 195 } },
+    { topology: "split", params: { gap: 170, wallThickness: 48, axis: "y" } },
+    { topology: "wrap_torus" },
     { topology: "rect" },
   ],
+  /** Ink posts left in the new shape until the next morph. */
+  RESIDUE_COUNT: 3,
+  RESIDUE_RADIUS: 30,
 };
 
 export const COLORS = {
@@ -581,6 +587,15 @@ export const SPAWN_TABLE = [
   { type: "tank", weight: 0.3, unlockAt: 95 },
   { type: "void", weight: 0.12, unlockAt: 105 },
 ];
+
+/** After this elapsed, Classic remaps weights: less fodder, more elites. */
+export const SPAWN_LATE_AT = 90;
+export const SPAWN_LATE_WEIGHTS = Object.freeze({
+  wanderer: 0.7,
+  snake: 0.45,
+  tank: 0.42,
+  void: 0.22,
+});
 
 export const HS_KEY = "geometry-arena-highscore";
 
