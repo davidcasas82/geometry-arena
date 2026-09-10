@@ -11,6 +11,7 @@
     "uat": "node uat/logic-uat.mjs && node uat/adversarial-uat.mjs && node uat/browser-uat.mjs",
     "uat:logic": "node uat/logic-uat.mjs",
     "uat:adversarial": "node uat/adversarial-uat.mjs",
-    "uat:browser": "node uat/browser-uat.mjs"
+    "uat:browser": "node uat/browser-uat.mjs",
+    "itch-shots": "node uat/capture-itch-shots.mjs"
   }
 }
